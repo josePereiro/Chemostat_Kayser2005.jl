@@ -1,0 +1,13 @@
+name = "Chemostat_Kayser2005"
+uuid = "62075988-fc80-11ea-3c7a-ad81f43b029e"
+authors = ["josePereiro <jose.pereiro.lab@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
+BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+Chemostat = "c5987326-81b3-11ea-28dd-b531745de20f"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
