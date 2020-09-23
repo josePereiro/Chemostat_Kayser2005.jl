@@ -1,8 +1,8 @@
 using DrWatson 
 quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
-import Chemostat_Kayser2005: save_data
-import Chemostat_Kayser2005.KayserData: HAYSER_CONV_TABLE1_FILE, HAYSER_CONV_MEDIUM_FILE
+import UtilsJL: save_data
+import Chemostat_Kayser2005.KayserData: KAYSER_CONV_TABLE1_FILE, KAYSER_CONV_MEDIUM_FILE
 
 ## ------------------------------------------------------------------
 # INFO
@@ -69,8 +69,6 @@ table1_converted["sGLC"][2:end] = ["mM"; table1["sGLC"][3:end] * 1e3 / 180.156];
 table1_converted["sAC"][2:end] = ["mM"; table1["sAC"][3:end] * 1e3 / 60.02];
 table1_converted["sNH4"][2:end] = ["mM"; table1["sNH4"][3:end] * 1e3 / 18];
 
-table1_converted
-
 ## ------------------------------------------------------------------
 # MEDIUM
 """
@@ -110,7 +108,7 @@ atpm = 2.81;
 ## ------------------------------------------------------------------
 # SAVING
 # Table1
-save_data(HAYSER_CONV_TABLE1_FILE, table1_converted)
+save_data(KAYSER_CONV_TABLE1_FILE, table1_converted)
 
 # Medium
-save_data(HAYSER_CONV_MEDIUM_FILE, medium_converted)
+save_data(KAYSER_CONV_MEDIUM_FILE, medium_converted)

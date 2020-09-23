@@ -1,7 +1,7 @@
 ## ------------------------------------------------------------------
-# HAYSER_CONV_TABLE1_FILE, HAYSER_CONV_MEDIUM_FILE
-medium = load_data(HAYSER_CONV_MEDIUM_FILE; verbose=false)
-table1 = load_data(HAYSER_CONV_TABLE1_FILE; verbose=false)
+# KAYSER_CONV_TABLE1_FILE, KAYSER_CONV_MEDIUM_FILE
+medium = load_data(KAYSER_CONV_MEDIUM_FILE; verbose=false)
+table1 = load_data(KAYSER_CONV_TABLE1_FILE; verbose=false)
 
 ## ------------------------------------------------------------------
 # BUNDLE
@@ -27,6 +27,8 @@ end
 msd_mets = ["AC", "GLC", "NH4"]
 val(dataid) = bundle[string(dataid)]["vals"]
 val(dataid, i) = val(dataid)[i]
+cval(id) = val("c$id")
+sval(id) = val("s$id")
 name(dataid) = bundle[string(dataid)]["name"]
 unit(dataid) = bundle[string(dataid)]["unit"]
 
