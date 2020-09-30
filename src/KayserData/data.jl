@@ -1,14 +1,13 @@
 ## ------------------------------------------------------------------
 # KAYSER_CONV_TABLE1_FILE, KAYSER_CONV_MEDIUM_FILE
-medium = load_data(KAYSER_CONV_MEDIUM_FILE; verbose=false)
-table1 = load_data(KAYSER_CONV_TABLE1_FILE; verbose=false)
+const medium = load_data(KAYSER_CONV_MEDIUM_FILE; verbose=false)
+const table1 = load_data(KAYSER_CONV_TABLE1_FILE; verbose=false)
 
 ## ------------------------------------------------------------------
 # BUNDLE
-bundle = Dict()
+const bundle = Dict()
 for (id, dat) in table1
     dict = get!(bundle, id, Dict())
-    n = length(dat)
     dict["name"] = dat[1]
     dict["unit"] = dat[2]
     dict["vals"] = dat[3:end] .|> Float64
@@ -24,7 +23,7 @@ end
 
 ## ------------------------------------------------------------------
 # API
-msd_mets = ["AC", "GLC", "NH4"]
+const msd_mets = ["AC", "GLC", "NH4"]
 val(dataid) = bundle[string(dataid)]["vals"]
 val(dataid, i) = val(dataid)[i]
 cval(id) = val("c$id")

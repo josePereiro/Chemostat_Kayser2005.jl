@@ -7,4 +7,7 @@ module KayserData
     include("dirs_and_files.jl")
     include("data.jl")
 
+    function __init__()
+        _create_dirs()
+    end
 end
