@@ -8,7 +8,19 @@ function load_mets_map()
     Kd_mets_map["THM"] = "thm_e"
     Kd_mets_map["NH4"] = "nh4_e"
     Kd_mets_map["CIT"] = "cit_e"
+    Kd_mets_map["AC"] = "ac_e"
     return Kd_mets_map
+end
+
+load_exch_met_map() = load_data(EXCH_MET_MAP_FILE; verbose = false)
+
+function load_iders_to_plot_map()
+    iders_to_plot_map = Dict()
+    mets_map = load_mets_map()
+    for Kd_ider in Kd.iders_to_plot
+        model_ider = 
+        iders_to_plot_map[]
+    end
 end
 
 ## ------------------------------------------------------------------

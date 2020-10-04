@@ -1,7 +1,8 @@
 module Chemostat_Kayser2005
     
-    using BSON
-    using DrWatson
+    import BSON
+    import DrWatson
+    import Chemostat
 
     include("Utils/Utils.jl")
     include("BegData/BegData.jl")

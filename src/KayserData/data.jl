@@ -24,6 +24,7 @@ end
 ## ------------------------------------------------------------------
 # API
 const msd_mets = ["AC", "GLC", "NH4"]
+const iders_to_plot = ["AC", "GLC", "NH4", "D"]
 val(dataid) = bundle[string(dataid)]["vals"]
 val(dataid, i) = val(dataid)[i]
 cval(id) = val("c$id")
