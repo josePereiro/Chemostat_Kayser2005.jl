@@ -13,11 +13,15 @@ set = ArgParseSettings()
     "--finish-clear"
         help = "clear cache at the end"   
         action = :store_true
+    "--backup-cache"
+        help = "create a backup of the cache dir"   
+        action = :store_true
 end
 parsed_args = parse_args(set)
 wcount = parse(Int, parsed_args["w"])
 init_clear_flag = parsed_args["init-clear"]
 finish_clear_flag = parsed_args["finish-clear"]
+backup_cache_flag = parsed_args["backup-cache"]
 
 ## ------------------------------------------------------------------
 import DrWatson: quickactivate
@@ -47,8 +51,38 @@ println("Working in: ", workers())
     import Chemostat_Kayser2005: KayserData, iJO1366
     const iJO = iJO1366
     const Kd = KayserData
-    ChU.set_cache_dir(iJO.MODEL_CACHE_DATA_DIR)
+end
 
+## ------------------------------------------------------------------
+# CACHE DIR
+@everywhere begin
+    const cache_dir = iJO.MODEL_CACHE_DATA_DIR
+    ChU.set_cache_dir(cache_dir)
+end
+
+## ------------------------------------------------------------------
+# BACKUP CACHES
+# TODO: package this
+function backup_temp_cache(cache_dir, backup_dir = cache_dir * "_backup"; 
+        wtime = 60)
+    while true
+        files = isdir(cache_dir) ? readdir(cache_dir) : []
+        for file in files
+            !isdir(backup_dir) && mkpath(backup_dir)
+            src_file = joinpath(cache_dir, file)
+            dest_file = joinpath(backup_dir, file)
+            if !isfile(dest_file) || mtime(src_file) > mtime(dest_file)
+                cp(src_file, dest_file; force = true, follow_symlinks = true)
+            end
+        end
+        sleep(wtime)
+    end
+end
+if backup_cache_flag
+    ChU.tagprintln_inmw("BACKING UP CACHES \n")
+    @async begin
+        backup_cache(cache_dir)
+    end
 end
 
 ## ------------------------------------------------------------------
@@ -129,19 +163,29 @@ end
 # SIMULATION
 # Any of the loops can be parallelized by just changing one of the 'map' functions
 
-to_map = Kd.val("D")[1:1] |> enumerate
+to_map = Kd.val("D") |> enumerate
 pmap(to_map) do (Di, D)
 
     ## SIMULATION PARAMS
     ξs = [Kd.val(:xi, Di)]
-    βs = [0.0; ChU.logspace(5.5, 6.5, 50)] 
+    # βs = [0.0; ChU.logspace(5.2, 6.8, 50)] 
+    βs = [0.0, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8] 
     
     to_map = Iterators.product(ξs, [βs], Di)
     map(to_map) do (ξ, βs, Di)
         
-        ## HASH SEEDS
+        # HASH SEEDS
         # TODO: add PARAMS hash
         sim_hash = (sim_global_id, ξ, Di)
+
+        # CHECK CACHE
+        res_id = (:RESULT, sim_hash)
+        if isfile(ChU.temp_cache_file(res_id))
+            ChU.tagprintln_inmw("RES FILE FOUNDED, CONTINUING ")
+            ## PASSING ID TO MASTER
+            put!(chnl, res_id)
+            return nothing
+        end
 
         dat = ChSU.cached_simulation(;
             epochlen = sim_params[:epochlen], 
@@ -160,13 +204,12 @@ pmap(to_map) do (Di, D)
             epconv_kwargs = epconv_kwargs
         )
         
-        ## SAVING DATA
+        # SAVING DATA
         model = prepare_model(ξ)
-        res_id = (:RESULT, sim_hash)
         ChU.save_cache(res_id, (Di, ξ, βs, model, dat); 
             headline = "CATCHING RESULTS\n")
         
-        ## PASSING ID TO MASTER
+        # PASSING ID TO MASTER
         put!(chnl, res_id)
         
         GC.gc()

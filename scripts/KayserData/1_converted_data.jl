@@ -1,8 +1,9 @@
-using DrWatson 
+import DrWatson: quickactivate
 quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
-import UtilsJL: save_data
-import Chemostat_Kayser2005.KayserData: KAYSER_CONV_TABLE1_FILE, KAYSER_CONV_MEDIUM_FILE
+import Chemostat_Kayser2005: KayserData, Chemostat
+const Kd = KayserData
+const ChU = Chemostat.Utils
 
 ## ------------------------------------------------------------------
 # INFO
@@ -20,32 +21,40 @@ import Chemostat_Kayser2005.KayserData: KAYSER_CONV_TABLE1_FILE, KAYSER_CONV_MED
     glucose-limited continuous cultures. 
     Data consistency was analysed by determination of the carbon 
     and nitrogen recoveries by applying reactor mass balances."
-    Met ids was set to be compatible with EColi BiGG model."
     Units: D => (1/ hr), Xv => (g/ L), Conc => (g/ L), 
     CTR and OTR => (g/ L hr), Recoveries => (%)
 """
 table1 = Dict();
-table1["D"] = ["Dilution", "1/ hr", 0.044, 0.066, 0.134, 0.150, 0.170, 0.203, 0.265,
+table1["D"] = ["Dilution", "1/ hr", 
+    0.044, 0.066, 0.134, 0.150, 0.170, 0.203, 0.265,
     0.280, 0.300, 0.347, 0.375, 0.388, 0.397, 0.410, 0.415];
-table1["Xv"] = ["Cell density", "gDW/ L",5.07, 5.05, 5.29, 5.24, 5.23, 5.41, 5.28, 5.53,
-    5.53, 5.61, 5.69, 5.88, 5.27, 3.82, 1.05];
-table1["sGLC"] = ["Glucose effluent conc", "g/ L",0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
-    0.000, 0.000, 0.000, 0.229, 0.295, 0.259, 0.398, 1.822, 6.048];
-table1["sAC"] = ["Acetic acid effluent conc", "g/ L", 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+table1["Xv"] = ["Cell density", "gDW/ L",
+    5.07, 5.05, 5.29, 5.24, 5.23, 5.41, 5.28, 
+    5.53, 5.53, 5.61, 5.69, 5.88, 5.27, 3.82, 1.05];
+table1["sGLC"] = ["Glucose effluent conc", "g/ L",  
+    0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 
+    0.000, 0.000, 0.229, 0.295, 0.259, 0.398, 1.822, 6.048];
+table1["sAC"] = ["Acetic acid effluent conc", "g/ L", 
+    0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
     0.000, 0.000, 0.000, 0.048, 0.051, 0.062, 1.140, 1.500];
-table1["sNH4"] = ["Ammoniate effluent conc", "g/ L", 1.709, 1.688, 1.652, 1.650, 1.656, 1.629, 1.632,
+table1["sNH4"] = ["Ammoniate effluent conc", "g/ L", 
+    1.709, 1.688, 1.652, 1.650, 1.656, 1.629, 1.632,
     1.620, 1.612, 1.617, 1.590, 1.556, 1.635, 1.835, 2.245];
 # CTR: Carbon dioxide transfer rate
-table1["CTR"] = ["Carbon dioxide transfer rate", "g/ L hr",0.286, 0.440, 0.924, 0.915, 1.113, 1.276, 1.536,
+table1["CTR"] = ["Carbon dioxide transfer rate", "g/ L hr", 
+    0.286, 0.440, 0.924, 0.915, 1.113, 1.276, 1.536,
     1.676, 1.795, 1.905, 1.888, 1.971, 2.015, 0.462, 0.207];
 # Oxygen transfer rate
-table1["OTR"] = ["Oxygen transfer rate", "g/ L hr", 0.222, 0.288, 0.576, 0.615, 0.896, 0.950, 1.044,
+table1["OTR"] = ["Oxygen transfer rate", "g/ L hr", 
+    0.222, 0.288, 0.576, 0.615, 0.896, 0.950, 1.044,
     1.226, 1.312, 1.357, 1.373, 1.434, 1.387, 0.330, 0.147];
 # Recovery % carbon
-table1["RC"] = ["Carbon recovery", "%", 96 , 97 , 101, 95 , 98 , 98 , 93 , 97 ,
-    97 , 96 , 95 , 97 , 93 , 76 , 89];
+table1["RC"] = ["Carbon recovery", "%", 
+    96, 97, 101, 95, 98, 98, 93, 
+    97, 97, 96, 95, 97, 93, 76, 89];
 # Recovery % nitrogen
-table1["RN"] = ["Nitrogen recovery", "%", 99, 98, 98, 98, 98, 98, 97,
+table1["RN"] = ["Nitrogen recovery", "%", 
+    99, 98, 98, 98, 98, 98, 97,
     98, 98, 99, 98, 98, 97, 98, 99];
 
 
@@ -63,7 +72,7 @@ table1["RN"] = ["Nitrogen recovery", "%", 99, 98, 98, 98, 98, 98, 97,
     CTR and OTR => (g/ L hr), Recoveries => (%)
 """
 
-table1_converted = copy(table1);
+table1_converted = deepcopy(table1);
 # C(g/L) * 1000/ MM(g/mol) = mM
 table1_converted["sGLC"][2:end] = ["mM"; table1["sGLC"][3:end] * 1e3 / 180.156];
 table1_converted["sAC"][2:end] = ["mM"; table1["sAC"][3:end] * 1e3 / 60.02];
@@ -108,7 +117,7 @@ atpm = 2.81;
 ## ------------------------------------------------------------------
 # SAVING
 # Table1
-save_data(KAYSER_CONV_TABLE1_FILE, table1_converted)
+ChU.save_data(Kd.KAYSER_CONV_TABLE1_FILE, table1_converted)
 
 # Medium
-save_data(KAYSER_CONV_MEDIUM_FILE, medium_converted)
+ChU.save_data(Kd.KAYSER_CONV_MEDIUM_FILE, medium_converted)

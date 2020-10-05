@@ -23,7 +23,7 @@ ChU.tagprintln_inmw("MAT MODEL LOADED",
     "\nfile:             ", relpath(src_file), 
     "\nfile size:        ", filesize(src_file), " bytes", 
     "\nmodel size:       ", size(model),
-    "\nnzabs_range:      ", nzabs_range(model.S),
+    "\nnzabs_range:      ", ChU.nzabs_range(model.S),
 )
 
 ## -------------------------------------------------------------------
@@ -205,4 +205,4 @@ ChU.tagprintln_inmw("FBA SOLUTION",
 
 ## -------------------------------------------------------------------
 # SAVING
-save_data(iJO.BASE_MODEL_FILE, fva_pp_model)
+ChU.save_data(iJO.BASE_MODEL_FILE, fva_pp_model)

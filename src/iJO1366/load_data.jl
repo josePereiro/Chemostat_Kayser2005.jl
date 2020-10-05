@@ -4,7 +4,7 @@
 
 function load_mets_map()
     Kd_mets_map = Dict()
-    Kd_mets_map["GLC"] = "glc_DASH_D_e"
+    Kd_mets_map["GLC"] = "glc__D_e"
     Kd_mets_map["THM"] = "thm_e"
     Kd_mets_map["NH4"] = "nh4_e"
     Kd_mets_map["CIT"] = "cit_e"
@@ -12,15 +12,21 @@ function load_mets_map()
     return Kd_mets_map
 end
 
+## ------------------------------------------------------------------
 load_exch_met_map() = load_data(EXCH_MET_MAP_FILE; verbose = false)
 
+## ------------------------------------------------------------------
 function load_iders_to_plot_map()
     iders_to_plot_map = Dict()
     mets_map = load_mets_map()
+    exch_met_map = load_exch_met_map()
     for Kd_ider in Kd.iders_to_plot
-        model_ider = 
-        iders_to_plot_map[]
+        model_ider = Kd_ider == "D" ? OBJ_IDER :
+            exch_met_map[mets_map[Kd_ider]]
+        iders_to_plot_map[model_ider] = Kd_ider
+        iders_to_plot_map[Kd_ider] = model_ider
     end
+    return iders_to_plot_map
 end
 
 ## ------------------------------------------------------------------

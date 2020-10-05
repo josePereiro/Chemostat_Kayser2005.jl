@@ -11,5 +11,6 @@ module KayserData
 
     function __init__()
         _create_dirs()
+        _load_and_bundle()
     end
 end
