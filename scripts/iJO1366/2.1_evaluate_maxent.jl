@@ -3,6 +3,7 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
 ## ------------------------------------------------------------------
 
+import SparseArrays
 import Chemostat_Kayser2005: Chemostat
 import Chemostat_Kayser2005.Chemostat.LP: MathProgBase
 const Ch = Chemostat
@@ -27,36 +28,82 @@ color_pool = [:orange, :blue, :red, :black, :violet,
 colors = Dict(Di => rand(color_pool) for Di in keys(bundles))
 
 ## ------------------------------------------------------------------
+cβidxs = Dict() # closest beta indexes
+exp_βs = Dict() # experimental beta
+βsimrange = Dict() # Simulat
+for (Di, bundle) in bundles
+
+    exp_growth = Kd.val("D", Di)
+    exp_xi = Kd.val("xi", Di)
+    ep_growths = ChU.av(bundle, exp_xi, bundle.βs, :ep, iJO.OBJ_IDER)
+
+    # Find the indexes of the closest beta
+    ep_growths_perms = sortperm(ep_growths)
+    β0 = β1 = 0
+    for (i, βi) in ep_growths_perms |> enumerate
+        if exp_growth < ep_growths[βi]
+            β1 = βi
+            β0 = i > 1 ? i - 1 : 0
+            cβidxs[Di] = (β0, β1)
+            break
+        end
+    end
+    (β0, β1) .|> iszero |> any && (@warn string(Di, "has no usable data"); continue)
+
+    # Find the exp beta (I use a linea approx)
+    m = (ep_growths[β0] - ep_growths[β1])/(bundle.βs[β0] - bundle.βs[β1])
+    c = ep_growths[β0] - m * bundle.βs[β0]
+    exp_β = (exp_growth - c)/m
+    exp_βs[Di] = (exp_β = exp_β, m = m, c = c)
+    
+    # Propose a simulation beta interval
+    dgrowth = exp_growth * 0.5
+    βsimrange[Di] = ((exp_growth - dgrowth - c) / m, (exp_growth + dgrowth - c) / m)
+
+end
+βsimrange
+
+## ------------------------------------------------------------------
 # GROWTH vs BETA
 function growth_vs_beta()
+    eps_ = 1e-5
     p = plot(title = nameof(iJO), 
-        xlabel = "log beta", ylabel = "growth rate")
-    for (Di, bundle) in bundles |> collect |> sort
-
+        xlabel = "log beta", ylabel = "log growth rate", 
+        legend = false
+    )
+    sbundles = sort(collect(bundles); by = (x) -> x[1])
+    fun1 = log10#(x) -> x
+    for (Di, bundle) in sbundles
+        Di != 7 && continue
         exp_growth = Kd.val("D", Di)
-        plot!(p, log10.(bundle.βs), fill(exp_growth, length(bundle.βs)); 
+        plot!(p, fun1.(bundle.βs), fill(fun1(exp_growth), length(bundle.βs)); 
             ls = :dash, color = colors[Di], lw = 3, label = "")
         
         exp_xi = Kd.val("xi", Di)
         fba_growth = ChU.av(bundle, exp_xi, :fba, iJO.OBJ_IDER)
-        plot!(p, log10.(bundle.βs), fill(fba_growth, length(bundle.βs)); 
+        fba_growth += eps_
+        plot!(p, fun1.(bundle.βs), fill(fun1(fba_growth), length(bundle.βs)); 
             ls = :dot, color = colors[Di], lw = 3, label = "")
 
         ep_growths = ChU.av(bundle, exp_xi, bundle.βs, :ep, iJO.OBJ_IDER)
+        ep_growths .+= eps_
         ep_stds = sqrt.(ChU.va(bundle, exp_xi, bundle.βs, :ep, iJO.OBJ_IDER))
-        plot!(p, log10.(bundle.βs), ep_growths; 
+        plot!(p, fun1.(bundle.βs), fun1.(ep_growths); 
             label = Di, lw = 3, color = colors[Di])
+
     end
     return p
 end
 growth_vs_beta()
+
 
 ## ------------------------------------------------------------------
 # TOTAL STOI ERROR vs BETA
 function total_stoi_err_vs_beta()
     p = plot(title = nameof(iJO), 
         xlabel = "log beta", ylabel = "stoi error [min/mean/max]")
-    for (Di, bundle) in bundles |> collect |> sort
+    sbundles = sort(collect(bundles); by = (x) -> x[1])
+    for (Di, bundle) in sbundles
         exp_xi = Kd.val("xi", Di)
         model = bundle[exp_xi, :net]
 

@@ -16,12 +16,16 @@ set = ArgParseSettings()
     "--backup-cache"
         help = "create a backup of the cache dir"   
         action = :store_true
+    "--ignore-partial-res"
+        help = "Ignore the top level caches"   
+        action = :store_true
 end
 parsed_args = parse_args(set)
 wcount = parse(Int, parsed_args["w"])
 init_clear_flag = parsed_args["init-clear"]
 finish_clear_flag = parsed_args["finish-clear"]
 backup_cache_flag = parsed_args["backup-cache"]
+ignore_partial_res_flag = parsed_args["ignore-partial-res"]
 
 ## ------------------------------------------------------------------
 import DrWatson: quickactivate
@@ -81,7 +85,7 @@ end
 if backup_cache_flag
     ChU.tagprintln_inmw("BACKING UP CACHES \n")
     @async begin
-        backup_cache(cache_dir)
+        backup_temp_cache(cache_dir)
     end
 end
 
@@ -113,6 +117,25 @@ end
     scaling_params[:scale_base] = 100.0
 
     params_hash = hash((sim_params, epmodel_kwargs, epconv_kwargs))
+
+    # From previous runs
+    βintervals = Dict(
+        1=>(1.0e6, 4.0e6),
+        2=>(2.0e6, 4.5e6),
+        3=>(3.5e6, 4.5e6),
+        4=>(3.5e6, 4.5e6),
+        5=>(3.5e6, 4.5e6),
+        6=>(3.5e6, 5.0e6),
+        7=>(3e6, 5.06),
+        8=>(3e6, 5.5e6),
+        9=>(3e6, 5.5e6),
+        10=>(3e6, 5.5e6),
+        11=>(4e6, 5.5e6),
+        12=>(4e6, 5.5e6),
+        13=>(4e6, 5.5e6),
+        14=>(4e6, 5.5e6),
+        15=>(4e6, 5.5e6),
+    )
 
 end
 
@@ -168,8 +191,9 @@ pmap(to_map) do (Di, D)
 
     ## SIMULATION PARAMS
     ξs = [Kd.val(:xi, Di)]
-    # βs = [0.0; ChU.logspace(5.2, 6.8, 50)] 
-    βs = [0.0, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8] 
+    β0, β1 = βintervals[Di]
+    βs = [0.0; range(β0, β1; length = 25)] 
+    # βs = [0.0, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7] 
     
     to_map = Iterators.product(ξs, [βs], Di)
     map(to_map) do (ξ, βs, Di)
@@ -180,8 +204,9 @@ pmap(to_map) do (Di, D)
 
         # CHECK CACHE
         res_id = (:RESULT, sim_hash)
-        if isfile(ChU.temp_cache_file(res_id))
-            ChU.tagprintln_inmw("RES FILE FOUNDED, CONTINUING ")
+        if !ignore_partial_res_flag && isfile(ChU.temp_cache_file(res_id))
+            ChU.tagprintln_inmw("RES FILE FOUNDED, CONTINUING ", 
+                "\nres_id: ", res_id, "\n")
             ## PASSING ID TO MASTER
             put!(chnl, res_id)
             return nothing
@@ -229,7 +254,7 @@ for id in res_ids
     # boundling
     bundle = get!(bundles, Di, ChU.ChstatBundle())
 
-    bundle[ξ, :net] = model
+    bundle[ξ, :net] = model |> ChU.compressed_model
     bundle[ξ, :fba] = dat[:fba]
 
     for (βi, β) in βs |> enumerate
