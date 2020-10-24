@@ -220,8 +220,8 @@ pmap(to_map) do (Di, D)
             get_model = function()
                 return prepare_model(ξ);
             end,
-            objider = iJO.OBJ_IDER, 
-            beta_info = [(iJO.OBJ_IDER, βs)],
+            objider = iJO.BIOMASS_IDER, 
+            beta_info = [(iJO.BIOMASS_IDER, βs)],
             costider = iJO.COST_IDER,
             clear_cache = false,
             use_seed = true,

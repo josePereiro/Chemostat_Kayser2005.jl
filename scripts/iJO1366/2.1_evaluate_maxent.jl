@@ -35,7 +35,7 @@ for (Di, bundle) in bundles
 
     exp_growth = Kd.val("D", Di)
     exp_xi = Kd.val("xi", Di)
-    ep_growths = ChU.av(bundle, exp_xi, bundle.βs, :ep, iJO.OBJ_IDER)
+    ep_growths = ChU.av(bundle, exp_xi, bundle.βs, :ep, iJO.BIOMASS_IDER)
 
     # Find the indexes of the closest beta
     ep_growths_perms = sortperm(ep_growths)
@@ -80,14 +80,14 @@ function growth_vs_beta()
             ls = :dash, color = colors[Di], lw = 3, label = "")
         
         exp_xi = Kd.val("xi", Di)
-        fba_growth = ChU.av(bundle, exp_xi, :fba, iJO.OBJ_IDER)
+        fba_growth = ChU.av(bundle, exp_xi, :fba, iJO.BIOMASS_IDER)
         fba_growth += eps_
         plot!(p, fun1.(bundle.βs), fill(fun1(fba_growth), length(bundle.βs)); 
             ls = :dot, color = colors[Di], lw = 3, label = "")
 
-        ep_growths = ChU.av(bundle, exp_xi, bundle.βs, :ep, iJO.OBJ_IDER)
+        ep_growths = ChU.av(bundle, exp_xi, bundle.βs, :ep, iJO.BIOMASS_IDER)
         ep_growths .+= eps_
-        ep_stds = sqrt.(ChU.va(bundle, exp_xi, bundle.βs, :ep, iJO.OBJ_IDER))
+        ep_stds = sqrt.(ChU.va(bundle, exp_xi, bundle.βs, :ep, iJO.BIOMASS_IDER))
         plot!(p, fun1.(bundle.βs), fun1.(ep_growths); 
             label = Di, lw = 3, color = colors[Di])
 

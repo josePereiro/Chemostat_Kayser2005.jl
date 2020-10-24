@@ -32,7 +32,7 @@ closest_βs = Dict()
 for (Di, bundle) in bundles
     exp_ξ = Kd.val("xi", Di)
     exp_μ = Kd.val("D", Di)
-    closest_βs[Di] = ChU.find_closest_beta(bundle, exp_ξ, exp_μ, iJO.OBJ_IDER)
+    closest_βs[Di] = ChU.find_closest_beta(bundle, exp_ξ, exp_μ, iJO.BIOMASS_IDER)
 end
 closest_βs
 
@@ -48,7 +48,7 @@ function closest_beta()
         
         # model
         exp_ξ = Kd.val("xi", Di)
-        μs = ChU.av(bundle, exp_ξ, bundle.βs, :ep, iJO.OBJ_IDER)
+        μs = ChU.av(bundle, exp_ξ, bundle.βs, :ep, iJO.BIOMASS_IDER)
         plot!(p, log10.(bundle.βs), μs, label = "", color = colors[Di], lw = 3)
 
         # exp
@@ -71,7 +71,7 @@ function growth_correlation()
         
         exp_ξ = Kd.val("xi", Di)
         exp_β = closest_βs[Di]
-        model_μ = ChU.av(bundle, exp_ξ, exp_β, :ep, iJO.OBJ_IDER)
+        model_μ = ChU.av(bundle, exp_ξ, exp_β, :ep, iJO.BIOMASS_IDER)
         exp_μ = Kd.val("D", Di)
         scatter!(p, [fun(exp_μ)], [fun(model_μ)], label = "", color = colors[Di])
 

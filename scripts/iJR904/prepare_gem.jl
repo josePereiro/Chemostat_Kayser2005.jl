@@ -14,7 +14,7 @@ import Chemostat.Utils: MetNet, to_symbol_dict, isrev, split_revs, rxn_mets,
 
 import Chemostat_Kayser2005: KayserData, BegData
 import Chemostat_Kayser2005.iJR904: MODEL_RAW_MAT_FILE, Kd_mets_map, beg_enz_cost, 
-                                    OBJ_IDER, ATPM_IDER, COST_IDER, beg_rxns_map, 
+                                    BIOMASS_IDER, ATPM_IDER, COST_IDER, beg_rxns_map, 
                                     ABS_MAX_BOUND, MAX_CONC, EXCH_MET_MAP_FILE
 const Kd = KayserData
 
@@ -36,10 +36,10 @@ tagprintln_inmw("MAT MODEL LOADED",
 # the maximal experimental growth rate in Kayser2005 is ~0.4 1/h
 # The raw model present a growth rate bigger than that, so it is ok
 # to use it directly as base model
-fbaout = fba(model, OBJ_IDER);
+fbaout = fba(model, BIOMASS_IDER);
 tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         " , OBJ_IDER,
-    "\nfba obj_val:      ", av(model, fbaout, OBJ_IDER),
+    "\nobj_ider:         " , BIOMASS_IDER,
+    "\nfba obj_val:      ", av(model, fbaout, BIOMASS_IDER),
     "\nmax exp obj_val:  ", maximum(Kd.val("D"))
 )
 
@@ -105,7 +105,7 @@ for rxn in model.rxns
     # The exchanges, the atpm and the biomass are synthetic reactions, so, 
     # they have should not have an associated enzimatic cost 
     any(startswith.(rxn, ["EX_", "DM_"])) && continue
-    rxn == OBJ_IDER && continue
+    rxn == BIOMASS_IDER && continue
     rxn == ATPM_IDER && continue
         
     # Only the internal, non reversible reactions have an associated cost
@@ -199,10 +199,10 @@ model = fva_preprocess(model,
     verbose = true);
 
 ##
-fbaout = fba(model, OBJ_IDER, COST_IDER);
+fbaout = fba(model, BIOMASS_IDER, COST_IDER);
 tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         " , OBJ_IDER,
-    "\nfba obj_val:      ", av(model, fbaout, OBJ_IDER),
+    "\nobj_ider:         " , BIOMASS_IDER,
+    "\nfba obj_val:      ", av(model, fbaout, BIOMASS_IDER),
     "\nmax exp obj_val:  ", maximum(Kd.val("D")),
     "\ncost_ider:        " , COST_IDER,
     "\nfba cost_val:     ", av(model, fbaout, COST_IDER),

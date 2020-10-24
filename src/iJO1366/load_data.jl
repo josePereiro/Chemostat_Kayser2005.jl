@@ -21,7 +21,7 @@ function load_iders_to_plot_map()
     mets_map = load_mets_map()
     exch_met_map = load_exch_met_map()
     for Kd_ider in Kd.iders_to_plot
-        model_ider = Kd_ider == "D" ? OBJ_IDER :
+        model_ider = Kd_ider == "D" ? BIOMASS_IDER :
             exch_met_map[mets_map[Kd_ider]]
         iders_to_plot_map[model_ider] = Kd_ider
         iders_to_plot_map[Kd_ider] = model_ider

@@ -35,7 +35,7 @@ for (exch, dat) in intake_info
         dat["c"] = f * c0
         apply_bound!(model, xi, intake_info; emptyfirst = true)
         growth = try 
-                av(model, fba(model, iJO.OBJ_IDER, iJO.COST_IDER), iJO.OBJ_IDER)
+                av(model, fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER), iJO.BIOMASS_IDER)
             catch err 
                 0.0
             end
@@ -83,11 +83,11 @@ for (Di, D) in to_map
     apply_bound!(model, xi, intake_info; emptyfirst = true)
 
     ## fba
-    fbaout = fba(model, iJO.OBJ_IDER, iJO.COST_IDER);
+    fbaout = fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER);
     tagprintln_inmw("FBA SOLUTION", 
         "\nxi:               ", xi,
-        "\nobj_ider:         ", iJO.OBJ_IDER,
-        "\nfba obj_val:      ", av(model, fbaout, iJO.OBJ_IDER),
+        "\nobj_ider:         ", iJO.BIOMASS_IDER,
+        "\nfba obj_val:      ", av(model, fbaout, iJO.BIOMASS_IDER),
         "\nexp obj_val:      ", Kd.val("D", Di),
         "\ncost_ider:        ", iJO.COST_IDER,
         "\nfba cost_val:     ", av(model, fbaout, iJO.COST_IDER),
@@ -118,8 +118,8 @@ for it in 1:50
     apply_bound!(model, xi, intake_info; emptyfirst = true)
 
     ## fba
-    fbaout = fba(model, iJO.OBJ_IDER, iJO.COST_IDER)
-    fba_growth = av(model, fbaout, iJO.OBJ_IDER)
+    fbaout = fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER)
+    fba_growth = av(model, fbaout, iJO.BIOMASS_IDER)
     
     diff = abs(fba_growth - Kd_growth)/abs(Kd_growth)
     diff < th && break # Converged
@@ -143,21 +143,21 @@ finish!(prog)
 
 ## ------------------------------------------------------------------
 model = load_data(iJO.BASE_MODEL_FILE; verbose = false)
-fbaout = fba(model, iJO.OBJ_IDER, iJO.COST_IDER);
+fbaout = fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER);
 tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         ", iJO.OBJ_IDER,
+    "\nobj_ider:         ", iJO.BIOMASS_IDER,
     "\nsize:             ", size(model),
-    "\nfba obj_val:      ", av(model, fbaout, iJO.OBJ_IDER),
+    "\nfba obj_val:      ", av(model, fbaout, iJO.BIOMASS_IDER),
     "\ncost_ider:        ", iJO.COST_IDER,
     "\nfba cost_val:     ", av(model, fbaout, iJO.COST_IDER),
     "\n\n"
 )
 model = well_scaled_model(model, 100.0; verbose = false)
-fbaout = fba(model, iJO.OBJ_IDER, iJO.COST_IDER);
+fbaout = fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER);
 tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         ", iJO.OBJ_IDER,
+    "\nobj_ider:         ", iJO.BIOMASS_IDER,
     "\nsize:             ", size(model),
-    "\nfba obj_val:      ", av(model, fbaout, iJO.OBJ_IDER),
+    "\nfba obj_val:      ", av(model, fbaout, iJO.BIOMASS_IDER),
     "\ncost_ider:        ", iJO.COST_IDER,
     "\nfba cost_val:     ", av(model, fbaout, iJO.COST_IDER),
     "\n\n"
@@ -175,10 +175,10 @@ lb!(model, iJO.COST_IDER, 0.0);
 ub!(model, iJO.COST_IDER, 1.0);
 # model = load_data(iJO.BASE_MODEL_FILE; verbose = false);
 save_data(iJO.BASE_MODEL_FILE, model)
-# fbaout = fba(model, iJO.OBJ_IDER, iJO.COST_IDER);
+# fbaout = fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER);
 # tagprintln_inmw("FBA SOLUTION", 
-#     "\nobj_ider:         ", iJO.OBJ_IDER,
-#     "\nfba obj_val:      ", av(model, fbaout, iJO.OBJ_IDER),
+#     "\nobj_ider:         ", iJO.BIOMASS_IDER,
+#     "\nfba obj_val:      ", av(model, fbaout, iJO.BIOMASS_IDER),
 #     "\ncost_ider:        ", iJO.COST_IDER,
 #     "\nfba cost_val:     ", av(model, fbaout, iJO.COST_IDER),
 #     "\n\n"

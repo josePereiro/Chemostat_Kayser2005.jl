@@ -30,10 +30,10 @@ ChU.tagprintln_inmw("MAT MODEL LOADED",
 # the maximal experimental growth rate in Kayser2005 is ~0.4 1/h
 # The raw model present a growth rate bigger than that, so it is ok
 # to use it directly as base model
-fbaout = ChLP.fba(model, iJO.OBJ_IDER);
+fbaout = ChLP.fba(model, iJO.BIOMASS_IDER);
 ChU.tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         ", iJO.OBJ_IDER,
-    "\nfba obj_val:      ", ChU.av(model, fbaout, iJO.OBJ_IDER),
+    "\nobj_ider:         ", iJO.BIOMASS_IDER,
+    "\nfba obj_val:      ", ChU.av(model, fbaout, iJO.BIOMASS_IDER),
     "\nmax exp obj_val:  ", maximum(Kd.val("D"))
 )
 ChU.summary(model, fbaout)
@@ -102,7 +102,7 @@ for rxn in model.rxns
     # The exchanges, the atpm and the biomass are synthetic reactions, so, 
     # they have should not have an associated enzimatic cost 
     any(startswith.(rxn, ["EX_", "DM_"])) && continue
-    rxn == iJO.OBJ_IDER && continue
+    rxn == iJO.BIOMASS_IDER && continue
     rxn == iJO.ATPM_IDER && continue
         
     # Only the internal, non reversible reactions have an associated cost
@@ -176,10 +176,10 @@ ChU.ub!(model, cost_exch_id, iJO.ABS_MAX_BOUND);
 ChU.summary(model, cost_exch_id)
 
 ## -------------------------------------------------------------------
-fbaout = ChLP.fba(model, iJO.OBJ_IDER, iJO.COST_IDER);
+fbaout = ChLP.fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER);
 ChU.tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         ", iJO.OBJ_IDER,
-    "\nfba obj_val:      ", ChU.av(model, fbaout, iJO.OBJ_IDER),
+    "\nobj_ider:         ", iJO.BIOMASS_IDER,
+    "\nfba obj_val:      ", ChU.av(model, fbaout, iJO.BIOMASS_IDER),
     "\nmax exp obj_val:  ", maximum(Kd.val("D")),
     "\ncost_ider:        ", iJO.COST_IDER,
     "\nfba cost_val:     ", ChU.av(model, fbaout, iJO.COST_IDER),
@@ -189,14 +189,14 @@ ChU.tagprintln_inmw("FBA SOLUTION",
 ## -------------------------------------------------------------------
 # FVA PREPROCESSING
 fva_pp_model = ChLP.fva_preprocess(model;
-    check_obj = iJO.OBJ_IDER,
+    check_obj = iJO.BIOMASS_IDER,
     verbose = true);
 
 ## -------------------------------------------------------------------
-fbaout = ChU.fba(fva_pp_model, iJO.OBJ_IDER, iJO.COST_IDER);
+fbaout = ChU.fba(fva_pp_model, iJO.BIOMASS_IDER, iJO.COST_IDER);
 ChU.tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         ", iJO.OBJ_IDER,
-    "\nfba obj_val:      ", ChU.av(fva_pp_model, fbaout, iJO.OBJ_IDER),
+    "\nobj_ider:         ", iJO.BIOMASS_IDER,
+    "\nfba obj_val:      ", ChU.av(fva_pp_model, fbaout, iJO.BIOMASS_IDER),
     "\nmax exp obj_val:  ", maximum(Kd.val("D")),
     "\ncost_ider:        ", iJO.COST_IDER,
     "\nfba cost_val:     ", ChU.av(fva_pp_model, fbaout, iJO.COST_IDER),
