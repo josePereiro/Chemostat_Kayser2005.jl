@@ -20,8 +20,6 @@ end
 parsed_args = parse_args(set)
 force_pull_flag = parsed_args["force-pull"]
 install_flag = parsed_args["install"]
-clear_cache_flag = parsed_args["clear-cache"]
-clear_fva_models_flag = parsed_args["clear-fva-models"]
 
 ## ------------------------------------------------------------------------
 using Pkg
