@@ -118,24 +118,24 @@ end
 
     params_hash = hash((sim_params, epmodel_kwargs, epconv_kwargs))
 
-    # From previous runs
-    βintervals = Dict(
-        1=>(1.0e6, 4.0e6),
-        2=>(2.0e6, 4.5e6),
-        3=>(3.5e6, 4.5e6),
-        4=>(3.5e6, 4.5e6),
-        5=>(3.5e6, 4.5e6),
-        6=>(3.5e6, 5.0e6),
-        7=>(3e6, 5.06),
-        8=>(3e6, 5.5e6),
-        9=>(3e6, 5.5e6),
-        10=>(3e6, 5.5e6),
-        11=>(4e6, 5.5e6),
-        12=>(4e6, 5.5e6),
-        13=>(4e6, 5.5e6),
-        14=>(4e6, 5.5e6),
-        15=>(4e6, 5.5e6),
-    )
+    # # From previous runs
+    # βintervals = Dict(
+    #     1=>(1.0e6, 4.0e6),
+    #     2=>(2.0e6, 4.5e6),
+    #     3=>(3.5e6, 4.5e6),
+    #     4=>(3.5e6, 4.5e6),
+    #     5=>(3.5e6, 4.5e6),
+    #     6=>(3.5e6, 5.0e6),
+    #     7=>(3e6, 5.06),
+    #     8=>(3e6, 5.5e6),
+    #     9=>(3e6, 5.5e6),
+    #     10=>(3e6, 5.5e6),
+    #     11=>(4e6, 5.5e6),
+    #     12=>(4e6, 5.5e6),
+    #     13=>(4e6, 5.5e6),
+    #     14=>(4e6, 5.5e6),
+    #     15=>(4e6, 5.5e6),
+    # )
 
 end
 
@@ -146,18 +146,14 @@ end
 @everywhere sim_global_id = "MAXENT_FBA_EP_v1"
 
 ## ------------------------------------------------------------------
-# SCALE MODELS
-# tagprintln_inmw("SCALING MODELS")
-# println_ifmw(" size: ", size(model), " S nzabs_range: ", nzabs_range(model.S), "\n")
-
-## ------------------------------------------------------------------
 ChU.tagprintln_inmw("CACHING MODEL")
 @everywhere model_hash = (:MODEL, sim_global_id)
 model = ChU.load_data(iJO.BASE_MODEL_FILE; verbose = false)
+model = ChU.clampfields!(model, [:b, :lb, :ub]; abs_max = iJO.ABS_MAX_BOUND, zeroth = iJO.ZEROTH)
 ChU.println_inmw(" size: ", size(model), " S nzabs_range: ", ChU.nzabs_range(model.S), "\n")
-ChU.tagprintln_inmw("RESCALING MODEL")
-model = ChU.well_scaled_model(model, scaling_params[:scale_base]; verbose = false)
-ChU.println_inmw(" size: ", size(model), " S nzabs_range: ", ChU.nzabs_range(model.S), "\n")
+# ChU.tagprintln_inmw("RESCALING MODEL")
+# model = ChU.well_scaled_model(model, scaling_params[:scale_base]; verbose = false)
+# ChU.println_inmw(" size: ", size(model), " S nzabs_range: ", ChU.nzabs_range(model.S), "\n")
 ChU.save_cache(model_hash, model; headline = "CACHING MODEL")
 
 ## ------------------------------------------------------------------
@@ -165,35 +161,47 @@ ChU.save_cache(model_hash, model; headline = "CACHING MODEL")
     model = ChU.load_cache(model_hash; verbose = false)
     intake_info = iJO.load_base_intake_info()
     # I rescale GLC to reach experimental growth
-    intake_info["EX_glc__D_e"]["c"] *= 1.22 
+    intake_info["EX_glc__D_e"]["c"] *= 1.25 
     ChSS.apply_bound!(model, xi, intake_info)
     return model
+end
+
+## ------------------------------------------------------------------
+let # Test fba
+    for (Di, exp_objval) in enumerate(Kd.val("D"))
+        xi = Kd.val("xi", Di)
+        model = prepare_model(xi)
+        fbaout = ChLP.fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER)
+        fba_objval = ChU.av(model, fbaout, iJO.BIOMASS_IDER)
+        @info "FBA Test" Di xi fba_objval exp_objval
+        println()
+    end
 end
 
 ## ------------------------------------------------------------------
 # RES IDS
 # Collect all the computed results ids for bundling
 const chnl = RemoteChannel() do
-    Channel{Any}(10)
+    Channel{Any}(length(workers()))
 end
 const res_ids = []
-const collector = @async while true
-    id = take!(chnl)
-    push!(res_ids, id)
+const collector = @async begin
+    while true
+        !isopen(chnl) && isempty(chnl) && break
+        push!(res_ids, take!(chnl))
+    end
 end
 
 ## ------------------------------------------------------------------
 # SIMULATION
 # Any of the loops can be parallelized by just changing one of the 'map' functions
-
+model = nothing; GC.gc()
 to_map = Kd.val("D") |> enumerate
 pmap(to_map) do (Di, D)
 
     ## SIMULATION PARAMS
     ξs = [Kd.val(:xi, Di)]
-    β0, β1 = βintervals[Di]
-    βs = [0.0; range(β0, β1; length = 25)] 
-    # βs = [0.0, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7] 
+    βs = [0.0] 
     
     to_map = Iterators.product(ξs, [βs], Di)
     map(to_map) do (ξ, βs, Di)
@@ -214,7 +222,6 @@ pmap(to_map) do (Di, D)
 
         dat = ChSU.cached_simulation(;
             epochlen = sim_params[:epochlen], 
-            # epochlen = 100, # Test
             verbose = true,
             sim_id = sim_hash,
             get_model = function()
@@ -243,10 +250,11 @@ pmap(to_map) do (Di, D)
 
     return nothing
 end; # map(Rd.ststs) do stst
+close(chnl)
+wait(collector) # wait for collector to get all ids
 
 ## -------------------------------------------------------------------
 # BOUNDLING
-sleep(1) # wait for collector to get all ids
 bundles = Dict()
 for id in res_ids
     Di, ξ, βs, model, dat = ChU.load_cache(id; verbose = false)

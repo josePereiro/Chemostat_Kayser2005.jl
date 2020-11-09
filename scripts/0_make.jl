@@ -56,7 +56,7 @@ if install_flag
         pkg"rm UtilsJL"
     catch; end
     pkg"add https://github.com/josePereiro/UtilsJL.git#master"
-    pkg"add https://github.com/josePereiro/Chemostat#adbeb2f"
+    pkg"add https://github.com/josePereiro/Chemostat#cb768d1"
     pkg"instantiate"
     pkg"build"
     pkg"test Chemostat"

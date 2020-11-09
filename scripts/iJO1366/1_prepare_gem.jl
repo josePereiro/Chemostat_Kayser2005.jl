@@ -167,7 +167,7 @@ foreach(exchs) do idx
 end
 
 # see Cossios paper (see README) for details in the Chemostat bound constraint
-ChU.apply_bound!(model, ξ, intake_info)
+ChSS.apply_bound!(model, ξ, intake_info)
 
 # tot_cost is the exchange that controls the bounds of the 
 # enzimatic cost contraint, we bound it to [0, 1.0]
@@ -194,7 +194,7 @@ fva_pp_model = ChLP.fva_preprocess(model;
 )
 
 ## -------------------------------------------------------------------
-fbaout = ChU.fba(fva_pp_model, iJO.BIOMASS_IDER, iJO.COST_IDER);
+fbaout = ChLP.fba(fva_pp_model, iJO.BIOMASS_IDER, iJO.COST_IDER);
 ChU.tagprintln_inmw("FBA SOLUTION", 
     "\nobj_ider:         ", iJO.BIOMASS_IDER,
     "\nfba obj_val:      ", ChU.av(fva_pp_model, fbaout, iJO.BIOMASS_IDER),
