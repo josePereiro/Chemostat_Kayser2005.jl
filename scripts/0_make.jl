@@ -4,7 +4,13 @@
 =#
 
 ## ------------------------------------------------------------------------
-using ArgParse
+try
+    using ArgParse
+catch err
+    import Pkg
+    Pkg.add("ArgParse")
+    using ArgParse
+end
 
 set = ArgParseSettings()
 @add_arg_table! set begin
