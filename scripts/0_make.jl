@@ -7,9 +7,8 @@
 try
     using ArgParse
 catch err
-    import Pkg
-    Pkg.add("ArgParse")
-    using ArgParse
+    @error "You must install ArgParse in the global enviroment. ]add ArgParse"
+    rethrow(err)
 end
 
 set = ArgParseSettings()
@@ -31,8 +30,7 @@ install_flag = parsed_args["install"]
 using Pkg
 try import DrWatson
 catch
-    import Pkg
-    pkg"add DrWatson"
+    @error "You must install DrWatson in the global enviroment. ]add DrWatson"
 end
 import DrWatson: quickactivate
 quickactivate(@__DIR__, "Chemostat_Kayser2005")
