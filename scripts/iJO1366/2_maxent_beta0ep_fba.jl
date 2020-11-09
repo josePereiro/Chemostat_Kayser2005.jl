@@ -118,25 +118,6 @@ end
 
     params_hash = hash((sim_params, epmodel_kwargs, epconv_kwargs))
 
-    # # From previous runs
-    # βintervals = Dict(
-    #     1=>(1.0e6, 4.0e6),
-    #     2=>(2.0e6, 4.5e6),
-    #     3=>(3.5e6, 4.5e6),
-    #     4=>(3.5e6, 4.5e6),
-    #     5=>(3.5e6, 4.5e6),
-    #     6=>(3.5e6, 5.0e6),
-    #     7=>(3e6, 5.06),
-    #     8=>(3e6, 5.5e6),
-    #     9=>(3e6, 5.5e6),
-    #     10=>(3e6, 5.5e6),
-    #     11=>(4e6, 5.5e6),
-    #     12=>(4e6, 5.5e6),
-    #     13=>(4e6, 5.5e6),
-    #     14=>(4e6, 5.5e6),
-    #     15=>(4e6, 5.5e6),
-    # )
-
 end
 
 ## ------------------------------------------------------------------
@@ -163,6 +144,10 @@ ChU.save_cache(model_hash, model; headline = "CACHING MODEL")
     # I rescale GLC to reach experimental growth
     intake_info["EX_glc__D_e"]["c"] *= 1.25 
     ChSS.apply_bound!(model, xi, intake_info)
+    # for cost to be around fba minimal value
+    fbaout = ChLP.fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER)
+    fba_cost_val = ChU.av(model, fbaout, iJO.COST_IDER)
+    ChU.bounds!(model, iJO.COST_IDER, fba_cost_val * 0.9, fba_cost_val * 1.1)
     return model
 end
 
