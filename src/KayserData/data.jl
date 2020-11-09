@@ -6,8 +6,10 @@ const table1 = Dict()
 function _load_and_bundle()
 
     empty!(medium)
+    !isfile(KAYSER_CONV_MEDIUM_FILE) && return bundle
     merge!(medium, load_data(KAYSER_CONV_MEDIUM_FILE; verbose=false))
     empty!(table1)
+    !isfile(KAYSER_CONV_TABLE1_FILE) && return bundle
     merge!(table1 ,load_data(KAYSER_CONV_TABLE1_FILE; verbose=false))
     empty!(bundle)
 
