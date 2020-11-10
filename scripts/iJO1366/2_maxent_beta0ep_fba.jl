@@ -110,8 +110,8 @@ end
     const epconv_kwargs = Dict()
     epconv_kwargs[:maxiter] = Int(1e4) # The maximum number of iteration before EP to return, even if not converged
     epconv_kwargs[:epsconv] = 1e-7 # The error threshold of convergence
-    epconv_kwargs[:maxvar] = 1e10
-    epconv_kwargs[:minvar] = 1e-10
+    epconv_kwargs[:maxvar] = 1e6
+    epconv_kwargs[:minvar] = 1e-6
 
     const scaling_params = Dict()
     scaling_params[:scale_base] = 100.0
