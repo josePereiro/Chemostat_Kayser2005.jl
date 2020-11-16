@@ -145,9 +145,9 @@ ChU.save_cache(model_hash, model; headline = "CACHING MODEL")
     intake_info["EX_glc__D_e"]["c"] *= 1.25 
     ChSS.apply_bound!(model, xi, intake_info)
     # for cost to be around fba minimal value
-    # fbaout = ChLP.fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER)
-    # fba_cost_val = ChU.av(model, fbaout, iJO.COST_IDER)
-    # ChU.bounds!(model, iJO.COST_IDER, fba_cost_val * 0.9, fba_cost_val * 1.1)
+    fbaout = ChLP.fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER)
+    fba_cost_val = ChU.av(model, fbaout, iJO.COST_IDER)
+    ChU.bounds!(model, iJO.COST_IDER, 0.0, fba_cost_val * 1.1)
     return model
 end
 
