@@ -34,16 +34,18 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
 using Distributed
 
 ## ------------------------------------------------------------------
+cproj = Base.active_project()
 length(workers()) < wcount && 
-    addprocs(wcount; exeflags = "--project")
+    addprocs(wcount; exeflags = "--project=$cproj")
 println("Working in: ", workers())
 
 ## ------------------------------------------------------------------
 @everywhere begin
 
-    import DrWatson: quickactivate
-    quickactivate(@__DIR__, "Chemostat_Kayser2005")
+    # import DrWatson: quickactivate
+    # quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
+    import Chemostat_Kayser2005
     import Chemostat_Kayser2005: Chemostat
     import Chemostat_Kayser2005.Chemostat.LP: MathProgBase
     const Ch = Chemostat
