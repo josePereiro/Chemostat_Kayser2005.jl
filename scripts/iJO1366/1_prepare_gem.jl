@@ -100,7 +100,7 @@ fwd_ider(rxn) = string(rxn, ChU.FWD_SUFFIX);
 bkwd_ider(rxn) = string(rxn, ChU.BKWD_SUFFIX);
 for rxn in model.rxns
     # The exchanges, the atpm and the biomass are synthetic reactions, so, 
-    # they have should not have an associated enzimatic cost 
+    # they should not have an associated enzimatic cost 
     any(startswith.(rxn, ["EX_", "DM_"])) && continue
     rxn == iJO.BIOMASS_IDER && continue
     rxn == iJO.ATPM_IDER && continue

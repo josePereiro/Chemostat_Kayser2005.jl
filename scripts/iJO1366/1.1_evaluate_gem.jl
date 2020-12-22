@@ -18,6 +18,7 @@ import ProgressMeter: ProgressThresh, Progress, next!, finish!, update!
 using Plots
 
 ## ------------------------------------------------------------------
+# Biomass medium sensivility
 let
     model = ChU.load_data(iJO.BASE_MODEL_FILE; verbose = false)
     xi = Kd.val("xi") |> maximum
@@ -33,10 +34,9 @@ let
             ChSS.apply_bound!(model, xi, intake_info; emptyfirst = true)
             growth = try 
                     ChU.av(model, ChLP.fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER), iJO.BIOMASS_IDER)
-                catch err 
-                    0.0
-                end
+                catch err; 0.0 end
             push!(res, growth)
+
             next!(prog; showvalues = [
                     (:exch, exch),
                     (:f, f),
@@ -66,6 +66,7 @@ let
 end
 
 ## ------------------------------------------------------------------
+# Checking fba_obj_val < exp_obj_val
 let to_map = Kd.val("D") |> enumerate
     for (Di, D) in to_map
 

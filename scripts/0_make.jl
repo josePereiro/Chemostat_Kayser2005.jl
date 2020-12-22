@@ -40,7 +40,7 @@ function force_pull()
     here = pwd()
     cd(@__DIR__)
     run(`git reset -q HEAD -- .`)
-    run(` git checkout -- .`)
+    run(`git checkout -- .`)
     try;
         run(`git pull`)
     catch err
