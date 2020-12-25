@@ -1,60 +1,48 @@
 import DrWatson: quickactivate
 quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
-## ------------------------------------------------------------------
 import MAT
 
-import Chemostat_Kayser2005: Chemostat
-const Ch = Chemostat
-const ChU = Chemostat.Utils
-const ChSS = Chemostat.SteadyState
-const ChLP = Chemostat.LP
+import Chemostat_Kayser2005
+const ChK = Chemostat_Kayser2005
 
-import Chemostat_Kayser2005: KayserData, iJO1366
-const iJO = iJO1366
-const Kd = KayserData
+const iJR = ChK.iJR904
+const Kd = ChK.KayserData # experimental data
+const Bd = ChK.BegData    # cost data
+
+const Ch = ChK.Chemostat
+const ChU = Ch.Utils
+const ChSS = Ch.SteadyState
+const ChLP = Ch.LP
 
 ## ------------------------------------------------------------------
 # LOAD RAW MODEL
-src_file = iJO.MODEL_RAW_MAT_FILE
-mat_model = MAT.matread(src_file)["iJO1366"]
+src_file = iJR.MODEL_RAW_MAT_FILE
+mat_model = MAT.matread(src_file)["model"]
 model = ChU.MetNet(mat_model; reshape=true)
 ChU.tagprintln_inmw("MAT MODEL LOADED", 
     "\nfile:             ", relpath(src_file), 
     "\nfile size:        ", filesize(src_file), " bytes", 
     "\nmodel size:       ", size(model),
-    "\nnzabs_range:      ", ChU.nzabs_range(model.S),
+    "\nChU.nzabs_range:      ", ChU.nzabs_range(model.S),
 )
+ChK.test_fba(model, iJR.BIOMASS_IDER; summary = false)
 
 ## -------------------------------------------------------------------
-# the maximal experimental growth rate in Kayser2005 is ~0.4 1/h
-# The raw model present a growth rate bigger than that, so it is ok
-# to use it directly as base model
-fbaout = ChLP.fba(model, iJO.BIOMASS_IDER);
-ChU.tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         ", iJO.BIOMASS_IDER,
-    "\nfba obj_val:      ", ChU.av(model, fbaout, iJO.BIOMASS_IDER),
-    "\nmax exp obj_val:  ", maximum(Kd.val("D"))
-)
-ChU.summary(model, fbaout)
-
-## -------------------------------------------------------------------
-# SET BOUNDS
+# Set bounds
 # The abs maximum bounds will be set to 100
 ChU.tagprintln_inmw("CLAMP BOUNDS", 
-    "\nabs max bound: ", iJO.ABS_MAX_BOUND
+    "\nabs max bound: ", iJR.ABS_MAX_BOUND
 )
 foreach(model.rxns) do ider
         ChU.isfixxed(model, ider) && return # fixxed reaction are untouched
 
         old_ub = ChU.ub(model, ider)
-        new_ub = abs(old_ub) < iJO.ABS_MAX_BOUND ? 
-            old_ub : sign(old_ub) * iJO.ABS_MAX_BOUND
-            ChU.ub!(model, ider, new_ub)
+        new_ub = old_ub == 0.0 ? 0.0 : iJR.ABS_MAX_BOUND
+        ChU.ub!(model, ider, new_ub)
 
         old_lb = ChU.lb(model, ider)
-        new_lb = abs(old_lb) < iJO.ABS_MAX_BOUND ? 
-            old_lb : sign(old_lb) * iJO.ABS_MAX_BOUND
+        new_lb = old_lb == 0.0 ? 0.0 : -iJR.ABS_MAX_BOUND
         ChU.lb!(model, ider, new_lb)
 end
 
@@ -62,9 +50,9 @@ end
 # CLOSING EXCHANGES
 exchs = ChU.exchanges(model)
 ChU.tagprintln_inmw("CLOSE EXCANGES", 
-    "\nexchanges: ", exchs |> length
+    "\nChU.exchanges: ", exchs |> length
 )
-# Close, for now, all exchanges for avoiding it to be in revs
+# Close, for now, all ChU.exchanges for avoiding it to be in revs
 # The reversible reactions will be splited for modeling cost
 # Exchanges have not associated cost, so, we do not split them
 foreach(exchs) do idx
@@ -84,7 +72,7 @@ for rxni in exchs
     exch_met_map[rxn] = met
     exch_met_map[met] = rxn
 end
-ChU.save_data(iJO.EXCH_MET_MAP_FILE, exch_met_map)
+ChU.save_data(iJR.EXCH_MET_MAP_FILE, exch_met_map)
 
 ## -------------------------------------------------------------------
 # ENZYMATIC COST INFO
@@ -99,26 +87,25 @@ cost_info = Dict()
 fwd_ider(rxn) = string(rxn, ChU.FWD_SUFFIX);
 bkwd_ider(rxn) = string(rxn, ChU.BKWD_SUFFIX);
 for rxn in model.rxns
-    # The exchanges, the atpm and the biomass are synthetic reactions, so, 
-    # they should not have an associated enzimatic cost 
+    # The ChU.exchanges, the atpm and the biomass are synthetic reactions, so, 
+    # they have should not have an associated enzimatic cost 
     any(startswith.(rxn, ["EX_", "DM_"])) && continue
-    rxn == iJO.BIOMASS_IDER && continue
-    rxn == iJO.ATPM_IDER && continue
+    rxn == iJR.BIOMASS_IDER && continue
+    rxn == iJR.KAYSER_BIOMASS_IDER && continue
+    rxn == iJR.ATPM_IDER && continue
         
     # Only the internal, non reversible reactions have an associated cost
     # We will split the rev reactions, so we save the cost for both versions (fwd, bkwd)
     if ChU.isrev(model, rxn)
-        cost_info[fwd_ider(rxn)] = -iJO.beg_enz_cost(rxn)
-        cost_info[bkwd_ider(rxn)] = -iJO.beg_enz_cost(rxn)
+        cost_info[fwd_ider(rxn)] = -iJR.beg_enz_cost(rxn)
+        cost_info[bkwd_ider(rxn)] = -iJR.beg_enz_cost(rxn)
     else
-        cost_info[rxn] = -iJO.beg_enz_cost(rxn)
+        cost_info[rxn] = -iJR.beg_enz_cost(rxn)
     end
 end
 
 ## -------------------------------------------------------------------
 # SPLITING REVS
-# The exchanges will not be touch because they 
-# was close
 ChU.tagprintln_inmw("SPLITING REVS", 
     "\nfwd_suffix:      ", ChU.FWD_SUFFIX,
     "\nbkwd_suffix:     ", ChU.BKWD_SUFFIX,
@@ -131,7 +118,7 @@ model = ChU.split_revs(model;
 ## -------------------------------------------------------------------
 # ADDING COST REACCION
 cost_met_id = "cost"
-cost_exch_id = iJO.COST_IDER
+cost_exch_id = iJR.COST_IDER
 ChU.tagprintln_inmw("ADDING COST", 
     "\ncosts to add: ", cost_info |> length,
     "\nmin abs coe:  ", cost_info |> values .|> abs |> minimum,
@@ -141,69 +128,53 @@ ChU.tagprintln_inmw("ADDING COST",
 )
 
 M, N = size(model)
-cost_met = ChU.Met(cost_met_id, S = collect(values(cost_info)), 
-    rxns = collect(keys(cost_info)), b = 0.0)
+cost_met = ChU.Met(cost_met_id, S = collect(values(cost_info)), rxns = collect(keys(cost_info)), b = 0.0)
 model = ChU.expanded_model(model, M + 1, N + 1)
 ChU.set_met!(model, ChU.findempty(model, :mets), cost_met)
-cost_exch = ChU.Rxn(cost_exch_id, S = [1.0], mets = [cost_met_id], 
-    lb = 0.0, ub = 0.0, c = 0.0)
+cost_exch = ChU.Rxn(cost_exch_id, S = [1.0], mets = [cost_met_id], lb = -iJR.ABS_MAX_BOUND, ub = 0.0, c = 0.0)
 ChU.set_rxn!(model, ChU.findempty(model, :rxns), cost_exch);
-ChU.summary(model, cost_exch_id)
 
 ## -------------------------------------------------------------------
 # SET BASE EXCHANGE
 ChU.tagprintln_inmw("SETTING EXCHANGES") 
-intake_info = iJO.load_base_intake_info()
 # To control the intakes just the metabolites defined in the 
 # base_intake_info (The minimum medium) will be opened.
 # The base model will be constraint as in a cultivation with 
 # experimental minimum xi
 # see Cossios paper (see README)
-ξ = minimum(Kd.val(:xi))
-# println("Minimum medium: ", iJR.base_intake_info)
+
 foreach(exchs) do idx
-    ChU.ub!(model, idx, iJO.ABS_MAX_BOUND) # Opening all outakes
+    ChU.ub!(model, idx, iJR.ABS_MAX_BOUND) # Opening all outakes
     ChU.lb!(model, idx, 0.0) # Closing all intakes
 end
 
 # see Cossios paper (see README) for details in the Chemostat bound constraint
-ChSS.apply_bound!(model, ξ, intake_info)
+xi = minimum(Kd.val(:xi))
+intake_info = iJR.load_base_intake_info()
+ChSS.apply_bound!(model, xi, intake_info; emptyfirst = true)
 
 # tot_cost is the exchange that controls the bounds of the 
 # enzimatic cost contraint, we bound it to [0, 1.0]
 ChU.lb!(model, cost_exch_id, 0.0);
-ChU.ub!(model, cost_exch_id, 1.0)
-ChU.summary(model, cost_exch_id)
+ChU.ub!(model, cost_exch_id, 1.0);
 
 ## -------------------------------------------------------------------
-fbaout = ChLP.fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER);
-ChU.tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         ", iJO.BIOMASS_IDER,
-    "\nfba obj_val:      ", ChU.av(model, fbaout, iJO.BIOMASS_IDER),
-    "\nmax exp obj_val:  ", maximum(Kd.val("D")),
-    "\ncost_ider:        ", iJO.COST_IDER,
-    "\nfba cost_val:     ", ChU.av(model, fbaout, iJO.COST_IDER),
-    "\n"
-)
+ChU.tagprintln_inmw("ADDING KAYSER BIOMASS")
+# Adding kayser biomass equation
+ChU.bounds!(model, iJR.BIOMASS_IDER, 0.0, 0.0)
+model = iJR.add_kayser_biomass(model; UB = 10 * iJR.ABS_MAX_BOUND)
+ChK.test_fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
 
 ## -------------------------------------------------------------------
 # FVA PREPROCESSING
-fva_pp_model = ChLP.fva_preprocess(model;
-    check_obj = iJO.BIOMASS_IDER,
+fva_model = ChLP.fva_preprocess(model, 
+    # eps = 1-9, # This avoid blocking totally any reaction
+    check_obj = iJR.KAYSER_BIOMASS_IDER,
     verbose = true
-)
+);
 
-## -------------------------------------------------------------------
-fbaout = ChLP.fba(fva_pp_model, iJO.BIOMASS_IDER, iJO.COST_IDER);
-ChU.tagprintln_inmw("FBA SOLUTION", 
-    "\nobj_ider:         ", iJO.BIOMASS_IDER,
-    "\nfba obj_val:      ", ChU.av(fva_pp_model, fbaout, iJO.BIOMASS_IDER),
-    "\nmax exp obj_val:  ", maximum(Kd.val("D")),
-    "\ncost_ider:        ", iJO.COST_IDER,
-    "\nfba cost_val:     ", ChU.av(fva_pp_model, fbaout, iJO.COST_IDER),
-    "\n"
-)
+ChK.test_fba(fva_model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
 
 ## -------------------------------------------------------------------
 # SAVING
-ChU.save_data(iJO.BASE_MODEL_FILE, fva_pp_model)
+ChU.save_data(iJR.BASE_MODEL_FILE, fva_model)

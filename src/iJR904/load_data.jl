@@ -149,16 +149,20 @@ end
 ## ------------------------------------------------------------------
 # base model exch met map
 # A quick way to get exchages from mets and te other way around
-load_exch_met_map() = load_data(EXCH_MET_MAP_FILE; verbose=false)
+load_exch_met_map() = ChU.load_data(EXCH_MET_MAP_FILE; verbose=false)
 
 ## ------------------------------------------------------------------
 # The intakes bounds of the network are determined by the 
 # medium concentration in the Chemostat model (see Cossios paper)
 # This is a base medium for modeling
+
 function load_base_intake_info()
-    return load_base_intake_info = Dict(
-        "EX_glc_LPAREN_e_RPAREN_" => Dict("c"=>  100.0,   "lb"=> -ABS_MAX_BOUND),
-        "EX_nh4_LPAREN_e_RPAREN_" => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),
+    return Dict(
+        "EX_glc_LPAREN_e_RPAREN_" => Dict("c"=> maximum(Kd.val(:cGLC)), "lb"=> -ABS_MAX_BOUND),
+        "EX_nh4_LPAREN_e_RPAREN_" => Dict("c"=> maximum(Kd.val(:cNH4)), "lb"=> -ABS_MAX_BOUND),
+        "EX_cit_LPAREN_e_RPAREN_"  => Dict("c"=> maximum(Kd.val(:cCIT)), "lb"=> -ABS_MAX_BOUND),
+        "EX_thm_LPAREN_e_RPAREN_"  => Dict("c"=> maximum(Kd.val(:cTHM)), "lb"=> -ABS_MAX_BOUND),
+        
         "EX_o2_LPAREN_e_RPAREN_"  => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),
         "EX_pi_LPAREN_e_RPAREN_"  => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),
         "EX_so4_LPAREN_e_RPAREN_" => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),

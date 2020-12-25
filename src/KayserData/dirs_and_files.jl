@@ -12,4 +12,5 @@ end
 
 # FILES
 const KAYSER_CONV_TABLE1_FILE = joinpath(KAYSER_PROCESSED_DATA_DIR, "table1_conv.bson")
+const KAYSER_CONV_TABLE2_FILE = joinpath(KAYSER_PROCESSED_DATA_DIR, "table2_conv.bson")
 const KAYSER_CONV_MEDIUM_FILE = joinpath(KAYSER_PROCESSED_DATA_DIR, "medium_conv.bson")

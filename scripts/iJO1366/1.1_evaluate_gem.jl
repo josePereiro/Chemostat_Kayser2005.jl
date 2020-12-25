@@ -1,7 +1,7 @@
 import DrWatson: quickactivate
 quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
-## ------------------------------------------------------------------
+# ------------------------------------------------------------------
 using MAT
 
 import Chemostat
@@ -73,24 +73,32 @@ let to_map = Kd.val("D") |> enumerate
         model = ChU.load_data(iJO.BASE_MODEL_FILE; verbose = false)
 
         ## Open intakes except Glucose
+        ex_glc_ider = "EX_glc__D_e"
         intake_info = iJO.load_base_intake_info()
-        intake_info["EX_glc__D_e"]["c"] = Kd.val(:cGLC, Di) * 1.2
+        intake_info[ex_glc_ider]["c"] = Kd.val(:cGLC, Di)
+
+        # Reajust biomass
+        
         
         # impose constraint
         xi = Kd.val(:xi, Di)
         ChSS.apply_bound!(model, xi, intake_info; emptyfirst = true)
 
-        ## fba
         fbaout = ChLP.fba(model, iJO.BIOMASS_IDER, iJO.COST_IDER);
         fba_obj_val = ChU.av(model, fbaout, iJO.BIOMASS_IDER)
+        fba_obj_val = ChU.av(model, fbaout, iJO.BIOMASS_IDER)
+        fba_ex_glc_val = ChU.av(model, fbaout, ex_glc_ider)
+        fba_ex_glc_b = ChU.bounds(model, ex_glc_ider)
         exp_obj_val = Kd.val("D", Di)
         ChU.tagprintln_inmw("FBA SOLUTION", 
-            "\nxi:               ", xi,
-            "\nobj_ider:         ", iJO.BIOMASS_IDER,
-            "\nfba obj_val:      ", fba_obj_val,
-            "\nexp obj_val:      ", exp_obj_val,
-            "\ncost_ider:        ", iJO.COST_IDER,
-            "\nfba cost_val:     ", ChU.av(model, fbaout, iJO.COST_IDER),
+            "\nxi:                      ", xi,
+            "\nobj_ider:                ", iJO.BIOMASS_IDER,
+            "\nfba fba_ex_glc_val:      ", fba_ex_glc_val,
+            "\nfba fba_ex_glc_b:        ", fba_ex_glc_b,
+            "\nfba obj_val:             ", fba_obj_val,
+            "\nexp obj_val:             ", exp_obj_val,
+            "\ncost_ider:               ", iJO.COST_IDER,
+            "\nfba cost_val:            ", ChU.av(model, fbaout, iJO.COST_IDER),
             "\n\n"
         )
         (fba_obj_val < exp_obj_val) && @warn "fba objval < exp objval" fba_obj_val exp_obj_val

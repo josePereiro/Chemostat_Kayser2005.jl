@@ -3,20 +3,20 @@
 # The rest of the model reactions will get the average enzimatic cost also 
 # reported by Beg.
 
-const _beg_enz_cost_dict = Dict()
-function _load_beg_enz_cost_dict()
-    !isempty(_beg_enz_cost_dict) && return
+function load_beg_enz_cost_dict()
+    beg_enz_cost_dict = Dict()
     beg_rxns_map = load_beg_rxns_map()
     for (i, beg_rxn) in enumerate(BegData.beg_enz_data.Enzyme)
         for model_rnx in beg_rxns_map[beg_rxn]
             if model_rnx != ""
-                global _beg_enz_cost_dict[model_rnx] = BegData.beg_enz_data[i, Symbol("ai/xi (h g / mmol)")]
+                beg_enz_cost_dict[model_rnx] = BegData.beg_enz_data[i, Symbol("ai/xi (h g / mmol)")]
             end
         end
     end
+    beg_enz_cost_dict
 end
 
 function beg_enz_cost(model_rxn)
-    _load_beg_enz_cost_dict()
-    return get(_beg_enz_cost_dict, model_rxn, Bd.AVE_COST)
+    beg_enz_cost_dict = load_beg_enz_cost_dict()
+    return get(beg_enz_cost_dict, model_rxn, Bd.AVE_COST)
 end

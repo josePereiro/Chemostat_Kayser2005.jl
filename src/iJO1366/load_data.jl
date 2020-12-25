@@ -53,9 +53,9 @@ function load_base_intake_info()
     base_intake_info["EX_cbl1_e"] = Dict("c" => MAX_CONC, "lb" => -ABS_MAX_BOUND)
 
     # from kayser
-    base_intake_info["EX_glc__D_e"] = Dict("c" => Kd.medium["cGLC"]["c"], "lb" => -ABS_MAX_BOUND)
-    base_intake_info["EX_nh4_e"] = Dict("c" => Kd.medium["cNH4"]["c"], "lb" => -ABS_MAX_BOUND)
-    base_intake_info["EX_cit_e"] = Dict("c" => Kd.medium["cCIT"]["c"], "lb" => -ABS_MAX_BOUND)
+    base_intake_info["EX_glc__D_e"] = Dict("c" => Kd.MEDIUM["cGLC"]["c"], "lb" => -ABS_MAX_BOUND)
+    base_intake_info["EX_nh4_e"] = Dict("c" => Kd.MEDIUM["cNH4"]["c"], "lb" => -ABS_MAX_BOUND)
+    base_intake_info["EX_cit_e"] = Dict("c" => Kd.MEDIUM["cCIT"]["c"], "lb" => -ABS_MAX_BOUND)
     # cTHM: thiamine missing from model. TODO: I can add an ne exchange
 
     return base_intake_info
