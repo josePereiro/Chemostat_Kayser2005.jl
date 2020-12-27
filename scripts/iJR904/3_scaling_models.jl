@@ -24,113 +24,110 @@ const ChEP = Ch.MaxEntEP
 const ChSU = Ch.SimulationUtils
 
 ## -------------------------------------------------------------------
+
+## -------------------------------------------------------------------
 let
     # setup
     cache_dir = iJR.MODEL_CACHE_DIR
 
     # orig model
-    exp = 4
-    model = ChU.load_data(iJR.BASE_MODEL_FILE)
-    obj_ider = iJR.KAYSER_BIOMASS_IDER
-    @info "Orig model" exp size(model) ChU.nzabs_range(model.S)
-    
-    # Scaling
-    scale_factor = 10.0
-    @info "Scaling" scale_factor
-    model = ChU.well_scaled_model(model, scale_factor)
-    
-    # fva model
-    cfile = joinpath(cache_dir, string("fva_cache_exp_", exp, "sf_", scale_factor, ".bson"))
-    if isfile(cfile)
-        model = ChU.load_data(cfile)
-    else
-        model = ChLP.fva_preprocess(model, check_obj = obj_ider, verbose = true)
-        ChU.save_data(cfile, model)
-    end
-    @info "fva model" exp size(model) ChU.nzabs_range(model.S)
+    for (exp, D) in Kd.val(:D) |> enumerate
 
-    # prepare model
-    objidx = ChU.rxnindex(model, obj_ider)
-    M, N = size(model)
-    exp_growth = Kd.val(:D, exp)
-    exp_xi = Kd.val(:xi, exp)
-    intake_info = iJR.intake_info(exp)
-    ChSS.apply_bound!(model, exp_xi, intake_info; 
-        emptyfirst = true)
-    fbaout = ChLP.fba(model, objidx)
-    fba_growth = ChU.av(model, fbaout, objidx)
+        model = ChU.load_data(iJR.BASE_MODEL_FILE)
+        model = ChU.fix_dims(model)
+        ChU.check_dims(model)
+        obj_ider = iJR.KAYSER_BIOMASS_IDER
+        fbaout = ChLP.fba(model, obj_ider)
+        fba_growth = ChU.av(model, fbaout, obj_ider)
+        @info "Orig model" exp size(model) ChU.nzabs_range(model.S) fba_growth
+        
+        # Scaling
+        scale_factor = 1000.0
+        model = ChU.well_scaled_model(model, scale_factor)
+        fbaout = ChLP.fba(model, obj_ider)
+        fba_growth = ChU.av(model, fbaout, obj_ider)
+        @info "Scaled model" exp scale_factor size(model) ChU.nzabs_range(model.S) fba_growth
 
-    model = ChEP.maxent_ep(model; alpha = Inf, epsconv = 1e-4, 
-            maxvar = 1e35, minvar = 1e-35)
-end
-#     # seed
-#     seed_file = iJR.BASE_BETA0_EPOUT_FILE
-#     if isfile(seed_file)
-#         epout = ChU.load_data(seed_file)
-#     else
-#         epout = ChEP.maxent_ep(model; alpha = Inf, epsconv = 1e-4, 
-#             maxvar = 1e35, minvar = 1e-35)
-#         ChU.save_data(seed_file, epout)
-#     end
+        # prepare model
+        exp_growth = Kd.val(:D, exp)
+        exp_xi = Kd.val(:xi, exp)
+        intake_info = iJR.intake_info(exp)
+        ChSS.apply_bound!(model, exp_xi, intake_info; 
+            emptyfirst = true)
+        fbaout = ChLP.fba(model, obj_ider)
+        fba_growth = ChU.av(model, fbaout, obj_ider)
+        @info "base model" exp size(model) ChU.nzabs_range(model.S) fba_growth
 
-#     # simulation
-#     beta_vec = zeros(N)
-#     betas = 10.0.^(1:0.1:8)
-#     for beta in betas
-#         beta_vec[objidx] = beta
-#         epout = ChEP.maxent_ep(model; beta_vec, alpha = Inf, damp = 0.9, epsconv = 1e-4, 
-#                             maxvar = 1e35, minvar = 1e-35, verbose = true, solution = epout,
-#                             maxiter = 1000
-#                         )
-#         ep_growth = ChU.av(model, epout, objidx)
-#         @info "Results" beta exp_growth fba_growth ep_growth
-#         println()
+        # fva model
+        fvafile = joinpath(cache_dir, string("fva_cache_exp_", exp, "_sf_", scale_factor, ".bson"))
+        if isfile(fvafile)
+            model = ChU.load_data(fvafile)
+        else
+            model = ChLP.fva_preprocess(model, check_obj = obj_ider, verbose = true)
+            ChU.save_data(fvafile, model)
+        end
+        fbaout = ChLP.fba(model, obj_ider)
+        fba_growth = ChU.av(model, fbaout, obj_ider)
+        @info "fva model" exp size(model) ChU.nzabs_range(model.S) fba_growth
 
-#         isnan(ep_growth) && break
-#         ep_growth == 0.0 && break
-#     end
-#     serialize("test.jls", epout)
-# end
+        # simulation
+        M, N = size(model)
+        objidx = ChU.rxnindex(model, obj_ider)
+        datfile = joinpath(iJR.MODEL_PROCESSED_DATA_DIR, string("ep_scaled__dat_exp", exp, ".bson"))
+        epouts = isfile(datfile) ? ChU.load_data(datfile).epouts : Dict()
+        beta_vec = zeros(N)
 
-## -------------------------------------------------------------------
-using ProgressMeter
-function test_well_scaled_model()
-    scale_factors = [1.1, 2.0, 5.0, 10.0, 20.0, 50.0]
-    orig_model = ChU.load_data(iJR.BASE_MODEL_FILE)
-    obj_ider = iJR.KAYSER_BIOMASS_IDER
+        # log approach
+        betas = [0.0; 10.0.^(3:0.05:15)]
+        epout_seed = isempty(epouts) ? nothing : epouts[maximum(keys(epouts))]
+        nan_beta = first(betas)
 
-    prog = Progress(length(scale_factors))
-    for scale_factor in scale_factors
+        for approach in [:log_approach, :linear_approach]
+            
+            @info "Starting" exp approach
 
-        scl_model = ChU.well_scaled_model(orig_model, scale_factor; 
-            verbose = true)
+            for beta in betas
 
-        orig_fbaout = ChLP.fba(orig_model, obj_ider)
-        scl_fbaout = ChLP.fba(scl_model, obj_ider)
+                nan_beta = beta
+                haskey(epouts, beta) && continue
 
-        for orig_rxn in orig_model.rxns
-            scl_rxn = ChU.rxnindex(scl_model, orig_rxn)
-            orig_av = ChU.av(orig_model, orig_fbaout, orig_rxn)
-            scl_av = ChU.av(scl_model, scl_fbaout, scl_rxn)
+                beta_vec[objidx] = beta
+                epout = ChEP.maxent_ep(model; 
+                                    beta_vec, alpha = Inf, damp = 0.9, epsconv = 1e-4, 
+                                    maxvar = 1e50, minvar = 1e-50, verbose = true, solution = epout_seed,
+                                    maxiter = 1000
+                                )
+                # info
+                ep_growth = ChU.av(model, epout, objidx)
+                @info "Results" exp beta exp_growth fba_growth ep_growth
+                println()
 
-            @assert isapprox(orig_av, scl_av; atol = 1e-8)
+                # out conditions
+                isnan(ep_growth) && break
+                ep_growth == 0.0 && break
+
+                # updating
+                epout_seed = epout
+                epouts[beta] = epout
+            end
+
+            # lineal approach
+            last_beta = maximum(keys(epouts))
+            bstep = abs(last_beta - nan_beta) / 100.0
+            @info "Dev" last_beta nan_beta bstep
+            betas = range(last_beta, 1.0e15; step = bstep)
         end
 
-        next!(prog; showvalues = [
-                ("scale_factor        ", scale_factor),
-                (": ----------------- ", "ORIGINAL MODEL"),
-                ("model size:         ", size(orig_model)),
-                ("nzabs_range:        ", ChU.nzabs_range(orig_model.S)),
-                ("obj_val:            ", ChU.av(orig_model, orig_fbaout, obj_ider)),
-                (": ----------------- ", "SCALED MODEL"),
-                ("model size:         ", size(scl_model)),
-                ("nzabs_range:        ", ChU.nzabs_range(scl_model.S)),
-                ("obj_val:            ", ChU.av(scl_model, scl_fbaout, obj_ider))
-            ]
-        )
+        # fba
+        fbaout = let
+            lmodel = deepcopy(model)
+            ChU.ub!(lmodel, obj_ider, Kd.val(:D, exp))
+            ChLP.fba(lmodel, obj_ider, iJR.COST_IDER)
+        end
 
-        sleep(3)
-    end
-    finish!(prog)
+        # saving
+        ChU.save_data(datfile, (;exp, model, epouts, fbaout))
+
+    end # for (exp, D)
+
 end
-test_well_scaled_model()

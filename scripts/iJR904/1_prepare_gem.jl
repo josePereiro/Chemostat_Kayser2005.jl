@@ -166,6 +166,9 @@ model = iJR.add_kayser_biomass(model; UB = 10 * iJR.ABS_MAX_BOUND)
 ChK.test_fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
 
 ## -------------------------------------------------------------------
+model = ChU.fix_dims(model)
+
+## -------------------------------------------------------------------
 # FVA PREPROCESSING
 fva_model = ChLP.fva_preprocess(model, 
     # eps = 1-9, # This avoid blocking totally any reaction

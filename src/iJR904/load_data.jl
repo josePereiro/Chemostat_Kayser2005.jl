@@ -10,6 +10,9 @@ function load_mets_map()
     Kd_mets_map["THM"] = "thm_e"
     Kd_mets_map["NH4"] = "nh4_e"
     Kd_mets_map["CIT"] = "cit_e"
+    Kd_mets_map["CO2"] = "co2_e"
+    Kd_mets_map["O2"] = "o2_e"
+    Kd_mets_map["AC"] = "ac_e"
     for (k, v) in Kd_mets_map
         Kd_mets_map[v] = k
     end

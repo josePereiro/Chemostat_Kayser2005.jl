@@ -52,10 +52,9 @@ let
         beta_vec = zeros(N)
 
         # log approach
-        last_beta = maximum(keys(epouts))
-        epout_seed = isempty(epouts) ? nothing : epouts[last_beta]
-        betas = [0.0; 10.0.^(3:0.05:8)]
-        nan_beta = last_beta
+        epout_seed = isempty(epouts) ? nothing : epouts[maximum(keys(epouts))]
+        betas = [0.0; 10.0.^(3:0.05:15)]
+        nan_beta = first(betas)
 
         for approach in [:log_approach, :linear_approach]
             
@@ -74,7 +73,7 @@ let
                                 )
                 # info
                 ep_growth = ChU.av(model, epout, objidx)
-                @info "Results" exp D beta exp_growth fba_growth ep_growth
+                @info "Results" exp beta exp_growth fba_growth ep_growth
                 println()
 
                 # out conditions
@@ -86,13 +85,22 @@ let
                 epouts[beta] = epout
             end
 
-            # lineal approach approach
+            # lineal approach
             last_beta = maximum(keys(epouts))
-            betas = range(last_beta, 2 * nan_beta; length = 1000)
+            bstep = abs(last_beta - nan_beta) / 100.0
+            @info "Dev" last_beta nan_beta bstep
+            betas = range(last_beta, 1.0e15; step = bstep)
+        end
+
+        # fba
+        fbaout = let
+            lmodel = deepcopy(model)
+            ChU.ub!(lmodel, obj_ider, Kd.val(:D, exp))
+            ChLP.fba(lmodel, obj_ider, iJR.COST_IDER)
         end
 
         # saving
-        ChU.save_data(datfile, (;exp, model, epouts))
+        ChU.save_data(datfile, (;exp, model, epouts, fbaout))
     
     end # for (exp, D)
 end

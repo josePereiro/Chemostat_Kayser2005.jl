@@ -109,11 +109,11 @@ table2["uNH4"] = ["Uptake NH4", "g/ g hr",
 # TABLE2 CONVERTED
 table2_converted = deepcopy(table2);
 # U(g/ g hr) * 1000/ MM(g/mol) = mmol/ g hr
-table2_converted["uGLC"][2:end] = ["mM"; table2["uGLC"][3:end] * 1e3 / 180.156];
-table2_converted["uAC"][2:end] = ["mM"; table2["uAC"][3:end] * 1e3 / 60.02];
-table2_converted["uCO2"][2:end] = ["mM"; table2["uCO2"][3:end] * 1e3 / 44.01];
-table2_converted["uO2"][2:end] = ["mM"; table2["uO2"][3:end] * 1e3 / 15.999];
-table2_converted["uNH4"][2:end] = ["mM"; table2["uNH4"][3:end] * 1e3 / 18];
+table2_converted["uGLC"][2:end] = ["mmol/ g hr"; table2["uGLC"][3:end] * 1e3 / 180.156];
+table2_converted["uCO2"][2:end] = ["mmol/ g hr"; table2["uCO2"][3:end] * 1e3 / 44.01];
+table2_converted["uO2"][2:end] = ["mmol/ g hr"; table2["uO2"][3:end] * 1e3 / 15.999];
+table2_converted["uAC"][2:end] = ["mmol/ g hr"; table2["uAC"][3:end] * 1e3 / 60.02];
+table2_converted["uNH4"][2:end] = ["mmol/ g hr"; table2["uNH4"][3:end] * 1e3 / 18];
 
 
 ## ------------------------------------------------------------------
@@ -158,7 +158,7 @@ atpm = 2.81;
 # Table1
 ChU.save_data(Kd.KAYSER_CONV_TABLE1_FILE, table1_converted)
 
-# Table1
+# Table2
 ChU.save_data(Kd.KAYSER_CONV_TABLE2_FILE, table2_converted)
 
 # Medium
