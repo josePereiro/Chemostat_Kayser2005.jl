@@ -52,7 +52,8 @@ let
     end
     finish!(prog)
 
-    p = plot(title = "Biomass medium sensivility", 
+    p = plot(
+            title = "Biomass medium sensivility", 
             xlabel = "fraction of initial conc", 
             ylabel = "growth"
         )
@@ -80,18 +81,18 @@ let
         
         # impose constraint
         xi = Kd.val(:xi, Di)
-        ChSS.apply_bound!(model, xi, intake_info; emptyfirst = true, ignore_miss = true)
+        ChSS.apply_bound!(model, xi, intake_info; emptyfirst = true)
 
-        fbaout = ChLP.fba(model, iJR.BIOMASS_IDER, iJR.COST_IDER);
-        fba_obj_val = ChU.av(model, fbaout, iJR.BIOMASS_IDER)
-        fba_obj_val = ChU.av(model, fbaout, iJR.BIOMASS_IDER)
+        fbaout = ChLP.fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER);
+        fba_obj_val = ChU.av(model, fbaout, iJR.KAYSER_BIOMASS_IDER)
+        fba_obj_val = ChU.av(model, fbaout, iJR.KAYSER_BIOMASS_IDER)
         fba_ex_glc_val = ChU.av(model, fbaout, iJR.GLC_EX_IDER)
         fba_ex_glc_b = ChU.bounds(model, iJR.GLC_EX_IDER)
         exp_obj_val = Kd.val("D", Di)
 
         ChU.tagprintln_inmw("FBA SOLUTION", 
             "\nxi:                      ", xi,
-            "\nobj_ider:                ", iJR.BIOMASS_IDER,
+            "\nobj_ider:                ", iJR.KAYSER_BIOMASS_IDER,
             "\nfba fba_ex_glc_val:      ", fba_ex_glc_val,
             "\nfba fba_ex_glc_b:        ", fba_ex_glc_b,
             "\nfba obj_val:             ", fba_obj_val,
@@ -126,8 +127,8 @@ let
             ChSS.apply_bound!(model, xi, intake_info; emptyfirst = true)
 
             ## fba
-            fbaout = ChLP.fba(model, iJR.BIOMASS_IDER, iJR.COST_IDER)
-            fba_growth = ChU.av(model, fbaout, iJR.BIOMASS_IDER)
+            fbaout = ChLP.fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+            fba_growth = ChU.av(model, fbaout, iJR.KAYSER_BIOMASS_IDER)
             return [fba_growth]
         end
 
@@ -142,21 +143,21 @@ end
 # Testing scaled model
 let
     model = ChU.load_data(iJR.BASE_MODEL_FILE; verbose = false)
-    fbaout = ChLP.fba(model, iJR.BIOMASS_IDER, iJR.COST_IDER);
+    fbaout = ChLP.fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER);
     ChU.tagprintln_inmw("FBA SOLUTION", 
-        "\nobj_ider:         ", iJR.BIOMASS_IDER,
+        "\nobj_ider:         ", iJR.KAYSER_BIOMASS_IDER,
         "\nsize:             ", size(model),
-        "\nfba obj_val:      ", ChU.av(model, fbaout, iJR.BIOMASS_IDER),
+        "\nfba obj_val:      ", ChU.av(model, fbaout, iJR.KAYSER_BIOMASS_IDER),
         "\ncost_ider:        ", iJR.COST_IDER,
         "\nfba cost_val:     ", ChU.av(model, fbaout, iJR.COST_IDER),
         "\n\n"
     )
     model = ChU.well_scaled_model(model, 100.0; verbose = false)
-    fbaout = ChLP.fba(model, iJR.BIOMASS_IDER, iJR.COST_IDER);
+    fbaout = ChLP.fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER);
     ChU.tagprintln_inmw("FBA SOLUTION", 
-        "\nobj_ider:         ", iJR.BIOMASS_IDER,
+        "\nobj_ider:         ", iJR.KAYSER_BIOMASS_IDER,
         "\nsize:             ", size(model),
-        "\nfba obj_val:      ", ChU.av(model, fbaout, iJR.BIOMASS_IDER),
+        "\nfba obj_val:      ", ChU.av(model, fbaout, iJR.KAYSER_BIOMASS_IDER),
         "\ncost_ider:        ", iJR.COST_IDER,
         "\nfba cost_val:     ", ChU.av(model, fbaout, iJR.COST_IDER),
         "\n\n"

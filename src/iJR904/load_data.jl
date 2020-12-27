@@ -161,7 +161,20 @@ function load_base_intake_info()
         "EX_glc_LPAREN_e_RPAREN_" => Dict("c"=> maximum(Kd.val(:cGLC)), "lb"=> -ABS_MAX_BOUND),
         "EX_nh4_LPAREN_e_RPAREN_" => Dict("c"=> maximum(Kd.val(:cNH4)), "lb"=> -ABS_MAX_BOUND),
         "EX_cit_LPAREN_e_RPAREN_"  => Dict("c"=> maximum(Kd.val(:cCIT)), "lb"=> -ABS_MAX_BOUND),
-        "EX_thm_LPAREN_e_RPAREN_"  => Dict("c"=> maximum(Kd.val(:cTHM)), "lb"=> -ABS_MAX_BOUND),
+        # "EX_thm_LPAREN_e_RPAREN_"  => Dict("c"=> maximum(Kd.val(:cTHM)), "lb"=> -ABS_MAX_BOUND), # fva returns (0.0, 0.0)
+        
+        "EX_o2_LPAREN_e_RPAREN_"  => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),
+        "EX_pi_LPAREN_e_RPAREN_"  => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),
+        "EX_so4_LPAREN_e_RPAREN_" => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),
+    )
+end
+
+function intake_info(exp)
+    return Dict(
+        "EX_glc_LPAREN_e_RPAREN_" => Dict("c"=> Kd.val(:cGLC, exp), "lb"=> -ABS_MAX_BOUND),
+        "EX_nh4_LPAREN_e_RPAREN_" => Dict("c"=> Kd.val(:cNH4, exp), "lb"=> -ABS_MAX_BOUND),
+        "EX_cit_LPAREN_e_RPAREN_"  => Dict("c"=> Kd.val(:cCIT, exp), "lb"=> -ABS_MAX_BOUND),
+        # "EX_thm_LPAREN_e_RPAREN_"  => Dict("c"=> maximum(Kd.val(:cTHM)), "lb"=> -ABS_MAX_BOUND), # fva returns (0.0, 0.0)
         
         "EX_o2_LPAREN_e_RPAREN_"  => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),
         "EX_pi_LPAREN_e_RPAREN_"  => Dict("c"=> MAX_CONC, "lb"=> -ABS_MAX_BOUND),
