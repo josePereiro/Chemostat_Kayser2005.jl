@@ -92,11 +92,16 @@ let
                 haskey(epouts, beta) && continue
 
                 beta_vec[objidx] = beta
-                epout = ChEP.maxent_ep(model; 
-                                    beta_vec, alpha = Inf, damp = 0.9, epsconv = 1e-4, 
-                                    maxvar = 1e50, minvar = 1e-50, verbose = true, solution = epout_seed,
-                                    maxiter = 1000
-                                )
+                epout = try; 
+                    ChEP.maxent_ep(model; 
+                            beta_vec, alpha = Inf, damp = 0.9, epsconv = 1e-4, 
+                            maxvar = 1e50, minvar = 1e-50, verbose = true, solution = epout_seed,
+                            maxiter = 1000
+                        )
+                catch err; (@warn(err); nothing); end
+
+                isnothing(epout) && break
+
                 # info
                 ep_growth = ChU.av(model, epout, objidx)
                 @info "Results" exp beta exp_growth fba_growth ep_growth
