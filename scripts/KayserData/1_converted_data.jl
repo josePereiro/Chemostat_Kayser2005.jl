@@ -92,13 +92,13 @@ table2["Biom"] = ["Growth Rate", "g/ L hr",
 table2["uGLC"] = ["Uptake Glucose", "g/ g hr", 
     0.087, 0.131, 0.253, 0.287, 0.325, 0.375, 0.502, 
     0.506, 0.542, 0.605, 0.640, 0.643, 0.723]
-table2["uCO2"] = ["Uptake CO2", "g/ g hr", 
+table2["uCO2"] = ["carbon dioxide evolution", "g/ g hr", 
     0.056, 0.087, 0.175, 0.175, 0.213, 0.236, 0.291, 
     0.303, 0.325, 0.340, 0.332, 0.335, 0.382]
 table2["uO2"] = ["Uptake O2", "g/ g hr", 
     0.0437, 0.0570, 0.1089, 0.1175, 0.1713, 0.1757, 
     0.1978, 0.2216, 0.2372, 0.2421, 0.2415, 0.2438, 0.2633]
-table2["uAC"] = ["Uptake Acetate", "g/ g hr", 
+table2["uAC"] = ["Acetate formation rate", "g/ g hr", 
     0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
     0.0000, 0.0000, 0.0000, 0.0000, 0.0032, 0.0034, 0.0047]
 table2["uNH4"] = ["Uptake NH4", "g/ g hr", 
@@ -109,11 +109,11 @@ table2["uNH4"] = ["Uptake NH4", "g/ g hr",
 # TABLE2 CONVERTED
 table2_converted = deepcopy(table2);
 # U(g/ g hr) * 1000/ MM(g/mol) = mmol/ g hr
-table2_converted["uGLC"][2:end] = ["mmol/ g hr"; table2["uGLC"][3:end] * 1e3 / 180.156];
-table2_converted["uCO2"][2:end] = ["mmol/ g hr"; table2["uCO2"][3:end] * 1e3 / 44.01];
-table2_converted["uO2"][2:end] = ["mmol/ g hr"; table2["uO2"][3:end] * 1e3 / 15.999];
-table2_converted["uAC"][2:end] = ["mmol/ g hr"; table2["uAC"][3:end] * 1e3 / 60.02];
-table2_converted["uNH4"][2:end] = ["mmol/ g hr"; table2["uNH4"][3:end] * 1e3 / 18];
+table2_converted["uGLC"][2:end] = ["mmol/ g hr"; -table2["uGLC"][3:end] * 1e3 / 180.156];  # Uptake
+table2_converted["uCO2"][2:end] = ["mmol/ g hr"; table2["uCO2"][3:end] * 1e3 / 44.01];     # Fromation
+table2_converted["uO2"][2:end] = ["mmol/ g hr"; -table2["uO2"][3:end] * 1e3 / 15.999];     # Uptake
+table2_converted["uAC"][2:end] = ["mmol/ g hr"; table2["uAC"][3:end] * 1e3 / 60.02];       # Formation
+table2_converted["uNH4"][2:end] = ["mmol/ g hr"; -table2["uNH4"][3:end] * 1e3 / 18];       # Uptake
 
 
 ## ------------------------------------------------------------------
