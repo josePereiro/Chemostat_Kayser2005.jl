@@ -62,8 +62,8 @@ exp_colors = let
 end
 
 ider_colors = let
-    colors = Plots.distinguishable_colors(length(FLX_IDERS))
-    Dict(met => color for (met, color) in zip(FLX_IDERS, colors))
+    colors = Plots.distinguishable_colors(length(FLX_IDERS) + 1)
+    Dict(met => color for (met, color) in zip([FLX_IDERS; "D"], colors))
 end
 
 method_colors = Dict(
@@ -135,80 +135,66 @@ let
 end
 
 ## -----------------------------------------------------------------------------------------------
-# let
-#     for exp in Hd.EXPS
-#         !haskey(DAT, exp) && continue
-#         status, yflxs, yield, d, model = DAT[exp]
-#         # @assert all(isapprox.(model.S * yflxs, model.b; atol = 1-3))
-#         @show maximum(abs.(model.S * yflxs .- model.b))
+# correlations
+FLX_IDERS_MAP = Dict(
+    "GLC" => "EX_glc_LPAREN_e_RPAREN__REV",
+    "CO2" => "EX_co2_LPAREN_e_RPAREN_",
+    "O2" => "EX_o2_LPAREN_e_RPAREN__REV",
+    "AC" => "EX_ac_LPAREN_e_RPAREN_",
+    "NH4" => "EX_nh4_LPAREN_e_RPAREN__REV",
+    "D" => iJR.KAYSER_BIOMASS_IDER
+)
 
-#         break
-#     end
-# end
+let
+    yield_p = plot(title = "yield tot corrs"; xlabel = "exp flx", ylabel = "model flx")
+    open_fba_p = plot(title = "open fba tot corrs"; xlabel = "exp flx", ylabel = "model flx")
+    bounded_fba_p = plot(title = "bounded fba tot corrs"; xlabel = "exp flx", ylabel = "model flx")
+    margin, m, M = -Inf, Inf, -Inf
+    for (Kd_ider, model_ider) in FLX_IDERS_MAP
+        Hd_fun = Kd_ider == "D" ? Kd.val : Kd.uval
+        for exp in EXPS
 
-# ## -----------------------------------------------------------------------------------------------
-# # correlations
-# FLX_IDERS_MAP = Dict(
-#     "GLC" => "EX_glc_LPAREN_e_RPAREN__REV",
-#     "CO2" => "EX_co2_LPAREN_e_RPAREN_",
-#     "O2" => "EX_o2_LPAREN_e_RPAREN__REV",
-#     "AC" => "EX_ac_LPAREN_e_RPAREN_",
-#     "NH4" => "EX_nh4_LPAREN_e_RPAREN__REV",
-#     "D" => iJR.KAYSER_BIOMASS_IDER
-# )
-
-# COLORS = Dict(
-#     "EX_glc_LPAREN_e_RPAREN__REV" => :blue,
-#     "EX_co2_LPAREN_e_RPAREN_" => :yellow,
-#     "EX_o2_LPAREN_e_RPAREN__REV" => :orange,
-#     "EX_ac_LPAREN_e_RPAREN_" => :red,
-#     "EX_nh4_LPAREN_e_RPAREN__REV" => :purple,
-#     iJR.KAYSER_BIOMASS_IDER => :black,
-# )
-
-# let
-#     yield_p = plot(title = "yield tot corrs"; xlabel = "exp flx", ylabel = "model flx")
-#     fba_p = plot(title = "fba tot corrs"; xlabel = "exp flx", ylabel = "model flx")
-#     margin, m, M = -Inf, Inf, -Inf
-#     for (Kd_ider, model_ider) in FLX_IDERS_MAP
-#         Hd_fun = Kd_ider == "D" ? Kd.val : Kd.uval
-#         for (exp, D) in Kd.val(:D) |> enumerate
-#             try
-#                 !haskey(DAT, D) && continue
-#                 status, yflxs, yield, d, model = DAT[D]
-#                 model_idx = ChU.rxnindex(model, model_ider)
+                color = ider_colors[Kd_ider]
+                Hd_flx = abs(Hd_fun(Kd_ider, exp)) # every body is possitive here
                 
-#                 color = COLORS[model_ider]
-#                 Hd_flx = Hd_fun(Kd_ider, D)
+                # yield
+                model = LPDAT[YIELD, :model, exp]
+                yout = LPDAT[YIELD, :yout, exp]
 
-#                 # yield
-#                 ymax_flx = SENSE[model_ider] * yflxs[model_idx]
-#                 scatter!(yield_p, [Hd_flx], [ymax_flx]; ms = 8,
-#                     color, alpha = 0.6, label = ""
-#                 )
+                ymax_flx = ChU.av(model, yout, model_ider)
+                scatter!(yield_p, [Hd_flx], [ymax_flx]; ms = 8,
+                    color, alpha = 0.6, label = ""
+                )
 
-#                 # fba
-#                 fbaout = ChLP.fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
-#                 fba_flx = ChU.av(model, fbaout, model_ider)
-#                 scatter!(fba_p, [Hd_flx], [fba_flx]; ms = 8,
-#                     color, alpha = 0.6, label = ""
-#                 )
+                # bounded fba
+                for (fba_type, p) in [(FBA_BOUNDED, bounded_fba_p) , 
+                                    (FBA_OPEN, open_fba_p)]
 
-#                 m = minimum([m, Hd_flx, ymax_flx, fba_flx])
-#                 M = maximum([M, Hd_flx, ymax_flx, fba_flx])
-#             catch err; @warn("Fail", err) end
-#         end
-#     end
-#     margin = abs(M - m)*0.1
-#     plot!(yield_p, [m - margin,M + margin], [m - margin,M + margin]; 
-#         ls = :dash, color = :black, label = "")
-#     plot!(fba_p, [m - margin,M + margin], [m - margin,M + margin]; 
-#         ls = :dash, color = :black, label = "")
-#     pname = "tot_corr"
-#     mysavefig([yield_p, fba_p], pname)
-# end
+                    model = LPDAT[fba_type, :model, exp]
+                    fbaout = LPDAT[fba_type, :fbaout, exp]
+                    
+                    fba_flx = ChU.av(model, fbaout, model_ider)
+                    scatter!(p, [Hd_flx], [fba_flx]; ms = 8,
+                        color, alpha = 0.6, label = ""
+                    )
+                    m = minimum([m, Hd_flx, ymax_flx, fba_flx])
+                    M = maximum([M, Hd_flx, ymax_flx, fba_flx])
+                end
 
-# ## -------------------------------------------------------------------
+        end
+    end
+    margin = abs(M - m) * 0.1
+    ps = [yield_p, bounded_fba_p, open_fba_p]
+    for p in ps
+        plot!(p, [m - margin, M + margin], [m - margin, M + margin]; 
+            ls = :dash, color = :black, label = "")
+    end
+    
+    pname = "tot_corr"
+    mysavefig(ps, pname; layout = (1, 3))
+end
+
+## -------------------------------------------------------------------
 # # # leyends
 # # # TODO fix this...
 # # let
