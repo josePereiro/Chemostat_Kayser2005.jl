@@ -3,6 +3,7 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
 import MAT
 
+import SparseArrays
 import Chemostat_Kayser2005
 const ChK = Chemostat_Kayser2005
 
@@ -170,14 +171,43 @@ model = ChU.fix_dims(model)
 
 ## -------------------------------------------------------------------
 # FVA PREPROCESSING
-fva_model = ChLP.fva_preprocess(model, 
-    # eps = 1-9, # This avoid blocking totally any reaction
-    check_obj = iJR.KAYSER_BIOMASS_IDER,
-    verbose = true
-);
+compressed(model) = model |> ChU.struct_to_dict |> ChU.compressed_copy
+const BASE_MODELS = isfile(iJR.BASE_MODELS_FILE) ? 
+    ChU.load_data(iJR.BASE_MODELS_FILE) : 
+    Dict("base_model" => compressed(model))
+for (exp, D) in Kd.val(:D) |> enumerate
 
-ChK.test_fba(fva_model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+    DAT = get!(BASE_MODELS, "fva_models", Dict())
+    ChU.tagprintln_inmw("DOING FVA", 
+        "\nexp:             ", exp,
+        "\nD:               ", D,
+        "\ncProgress:       ", length(DAT),
+        "\n"
+    )
+    haskey(DAT, exp) && continue # cached
 
-## -------------------------------------------------------------------
-# SAVING
-ChU.save_data(iJR.BASE_MODEL_FILE, fva_model)
+    ## -------------------------------------------------------------------
+    # prepare model
+    model0 = deepcopy(model)
+    M, N = size(model0)
+    exp_xi = Kd.val(:xi, exp)
+    intake_info = iJR.intake_info(exp)
+    ChSS.apply_bound!(model0, exp_xi, intake_info; 
+        emptyfirst = true)
+
+    ChK.test_fba(exp, model0, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+    fva_model = ChLP.fva_preprocess(model0, 
+        # eps = 1-9, # This avoid blocking totally any reaction
+        check_obj = iJR.KAYSER_BIOMASS_IDER,
+        verbose = true
+    );
+    ChK.test_fba(exp, fva_model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+    
+    # storing
+    DAT[exp] = compressed(fva_model)
+
+    ## -------------------------------------------------------------------
+    # caching
+    ChU.save_data(iJR.BASE_MODELS_FILE, BASE_MODELS);
+    GC.gc()
+end

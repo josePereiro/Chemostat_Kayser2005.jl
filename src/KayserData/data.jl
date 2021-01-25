@@ -37,6 +37,7 @@ function _load_and_bundle()
             dict["name"] = dat["name"]
             dict["unit"] = dat["unit"]
             dict["vals"] = fill(float(dat["c"]), n)
+            dict["D"] = BUNDLE["D"]["vals"]
         end
     end
 
@@ -46,33 +47,27 @@ function _load_and_bundle()
     dict["name"] = "Cell specific dilution rate"
     dict["unit"] = "gDW/ L hr"
     dict["vals"] = BUNDLE["Xv"]["vals"] ./ BUNDLE["Xv"]["D"];
+    dict["D"] = BUNDLE["Xv"]["D"];
     BUNDLE
 end
 
 ## ------------------------------------------------------------------
 # API
+const EXPS = 1:15
 const msd_mets = ["AC", "GLC", "NH4"]
 const iders_to_plot = ["AC", "GLC", "NH4", "D"]
 val(dataid) = BUNDLE[string(dataid)]["vals"]
 val(dataid, exp::Int) = val(dataid)[exp]
 function val(dataid, exp)
-    dat = BUNDLE[dataid]
+    dat = BUNDLE[string(dataid)]
     i = findfirst(dat["D"] .== exp)
-    val(dataid, i)
+    val(dataid)[i]
 end
 val(dataid, exp, dflt) = try; return val(dataid, exp); catch err; (@warn(err); dflt) end
 
-cval(id) = val("c$id")
-cval(id, exp) = val("c$id", exp)
-cval(id, exp, dflt) = val("c$id", exp, dflt)
-
-sval(id) = val("s$id")
-sval(id, exp) = val("s$id", exp)
-sval(id, exp, dflt) = val("s$id", exp, dflt)
-
-uval(id) = val("u$id")
-uval(id, exp) = val("u$id", exp)
-uval(id, exp, dflt) = val("u$id", exp, dflt)
+cval(id, args...) = val("c$id", args...)
+sval(id, args...) = val("s$id", args...)
+uval(id, args...) = val("u$id", args...)
 
 name(dataid) = BUNDLE[string(dataid)]["name"]
 unit(dataid) = BUNDLE[string(dataid)]["unit"]
