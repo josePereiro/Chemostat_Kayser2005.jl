@@ -67,10 +67,11 @@ exp_colors = let
     Dict(exp => color for (exp, color) in zip(EXPS, colors))
 end
 
-ider_colors = let
-    colors = Plots.distinguishable_colors(length(FLX_IDERS))
-    Dict(met => color for (met, color) in zip(FLX_IDERS, colors))
-end
+ider_colors = Dict(
+    "GLC" => :red, "CO2" => :yellow,
+    "O2" => :blue, "AC" => :orange, 
+    "NH4" => :green, "D" => :black,
+)
 
 method_colors = Dict(
     HOMO => :red,
@@ -93,8 +94,6 @@ let
             datfile = INDEX[method, :DFILE, exp]
             dat = deserialize(datfile)
             
-            global dat0 = dat
-            
             model = dat[:model]
             objidx = ChU.rxnindex(model, objider)
             epouts = dat[:epouts]
@@ -103,17 +102,14 @@ let
             exp_xi = Kd.val(:xi, exp)
 
             println()
-            @info("Doing", exp, method, length(dat[:epouts]), epout.iter); 
-            # fbaout = dat[:fbaout]
+            @info("Doing", exp, method, length(dat[:epouts]), epout.iter);
 
             # Biomass
-            # fba_biom = ChU.av(model, fbaout, objidx)
             ep_biom = ChU.av(model, epout, objidx)
             ep_std = sqrt(ChU.va(model, epout, objidx))
             Kd_biom = Kd.val("D", exp)
             
             # store
-            # DAT[:fba  , :flx, objider, exp] = fba_biom
             DAT[method, :ep   , :flx, objider, exp] = ep_biom
             DAT[method, :eperr, :flx, objider, exp] = ep_std
             DAT[method, :Kd   , :flx, objider, exp] = Kd_biom
@@ -262,22 +258,6 @@ let
 
         end
 
-        # fba corr
-        # # fba_vals = DAT[:fba, dat_prefix, iders, EXPS]
-        # p2 = plot(title = "$(iJR.PROJ_IDER) (FBA)", 
-        #     ylabel = "exp $(dat_prefix)",
-        #     xlabel = "model $(dat_prefix)", 
-        # )
-        # scatter!(p2, fba_vals, Kd_vals; scatter_params...)
-        # plot!(p2, [m,M], [m,M]; ls = :dash, color = :black, label = "")
-
-        # mysavefig([p1, p2], pname)
-
-        # # zoom
-        # pname = string(dat_prefix, "_tot_corr_zoom")
-        # ps = plot.([p1, p2]; xlim = zoom_lim, ylim = zoom_lim)
-        # mysavefig(ps, pname)
-
         layout = (1, length(ps))
         pname = string(dat_prefix, "_tot_corr")
         mysavefig(ps, pname; layout)
@@ -305,10 +285,6 @@ let
             plot!(p, EXPS, ep_vals; 
                 label = string(method), color, alpha = 0.5, lw = 5, ls = :dash, xticks)
             
-            # fba_vals = DAT[method, :fba, :flx, ider, EXPS]
-            # plot!(p, EXPS, fba_vals; 
-            #     label = "fba", color = :red, alpha = 0.5, lw = 5, ls = :dash, xticks)
-            
             fva_ranges = DAT[method, :fva, :flx, ider, EXPS]
             plot!(p, EXPS, last.(fva_ranges);  
                 label = "", color, alpha = 0.8, ls = :dot, lw = 3, xticks)
@@ -322,28 +298,19 @@ let
     
 end
 
-
-## -------------------------------------------------------------------
-# let
-#     Kd_met, exp = "GLC", 1
-#     datfile = INDEX[method, :DFILE, exp]
-#     dat = deserialize(datfile)
-#     # dat[[:ep, :fba, :Kd], :flx, Kd_met, exp]
-#     dat[:ep, :flx, Kd_met, exp]
-# end
-
 ## -------------------------------------------------------------------
 # marginal distributions
 let 
-    objider = iJR.BIOMASS_IDER
+    objider = iJR.KAYSER_BIOMASS_IDER
     size = [300, 250]
-    # method = EXPECTED
+    Kd_mets_map = iJR.load_mets_map()
+    exch_met_map = iJR.load_exch_met_map()
 
     # Iders
-    model_iders, Kd_iders = [iJR.BIOMASS_IDER], ["D"]
+    model_iders, Kd_iders = [objider], ["D"]
     for Kd_met in CONC_IDERS
-        model_met = iJR.Kd_mets_map[Kd_met]
-        model_exch = iJR.exch_met_map[model_met]
+        model_met = Kd_mets_map[Kd_met]
+        model_exch = exch_met_map[model_met]
         push!(model_iders, model_exch)
         push!(Kd_iders, string("u", Kd_met))
     end
@@ -365,8 +332,8 @@ let
                 dat = deserialize(datfile)
                 model = dat[:model]
                 objidx = ChU.rxnindex(model, objider)
-                exp_beta = dat[:exp_beta]
                 epouts = dat[:epouts]
+                exp_beta = maximum(keys(epouts))
                 epout = epouts[exp_beta]
                 ep_av = ChU.av(model, epout, model_ider)
                 ep_va = sqrt(ChU.va(model, epout, model_ider))
@@ -412,18 +379,21 @@ let
             push!(ps, p)
         end
 
-        for k in [:xi, :D, :cGLC]
+        for k in [:xi, :D, :sGLC]
             p = plot(;title = Kd_ider, size)
             xticks =  (EXPS, string.(EXPS))
-            p = bar!(p, EXPS, Kd.val(k); title = k, label = "", xticks)
+            vals = [Kd.val(k, exp) for exp in EXPS]
+            p = bar!(p, EXPS, vals; title = k, label = "", xticks)
             push!(ps, p)
             push!(ps2, p)
         end
 
         pname = string(Kd_ider, "_marginals")
         mysavefig(ps, pname)
+
+        method = EXPECTED
         pname = string(Kd_ider, "_marginals_vs_beta")
-        mysavefig(ps2, pname)
+        mysavefig(ps2, pname; method)
     end
 
 end 

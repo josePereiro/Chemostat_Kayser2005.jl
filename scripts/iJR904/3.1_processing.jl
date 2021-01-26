@@ -33,6 +33,7 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     import UtilsJL
     const UJL = UtilsJL
     
+    import FileIO
     using Plots
     import GR
     GR.inline("png")
@@ -61,10 +62,11 @@ exp_colors = let
     Dict(exp => color for (exp, color) in zip(EXPS, colors))
 end
 
-ider_colors = let
-    colors = Plots.distinguishable_colors(length(FLX_IDERS) + 1)
-    Dict(met => color for (met, color) in zip([FLX_IDERS; "D"], colors))
-end
+ider_colors = Dict(
+    "GLC" => :red, "CO2" => :yellow,
+    "O2" => :blue, "AC" => :orange, 
+    "NH4" => :green, "D" => :black,
+)
 
 method_colors = Dict(
     FBA_OPEN => :red,
@@ -118,12 +120,12 @@ let
                 exglc_idx = ChU.rxnindex(model, "EX_glc_LPAREN_e_RPAREN__REV")
                 biomass_idx = ChU.rxnindex(model, iJR.KAYSER_BIOMASS_IDER)
                 
-                Hd_val = Kd.val(id, exp)
+                Kd_val = Kd.val(id, exp)
                 exp_yield = abs(Kd.val("D", exp) / Kd.uval("GLC", exp))
-                scatter!(p, [Hd_val], [model_yield]; ms = 8,
+                scatter!(p, [Kd_val], [model_yield]; ms = 8,
                         color = :blue, alpha = 0.6, label = ""
                 )
-                scatter!(p, [Hd_val], [exp_yield]; ms = 8,
+                scatter!(p, [Kd_val], [exp_yield]; ms = 8,
                         color = :red, alpha = 0.6, label = ""
                 )
             catch err; @warn("Fail", err) end
@@ -144,25 +146,35 @@ FLX_IDERS_MAP = Dict(
     "NH4" => "EX_nh4_LPAREN_e_RPAREN__REV",
     "D" => iJR.KAYSER_BIOMASS_IDER
 )
-
+    
+SENSE = Dict(
+    "GLC" => -1,
+    "CO2" => 1,
+    "O2" => -1,
+    "AC" => 1,
+    "NH4" => -1,
+    "D" => 1
+)
+## -----------------------------------------------------------------------------------------------
+# flx correlations
 let
     yield_p = plot(title = "yield tot corrs"; xlabel = "exp flx", ylabel = "model flx")
     open_fba_p = plot(title = "open fba tot corrs"; xlabel = "exp flx", ylabel = "model flx")
     bounded_fba_p = plot(title = "bounded fba tot corrs"; xlabel = "exp flx", ylabel = "model flx")
     margin, m, M = -Inf, Inf, -Inf
     for (Kd_ider, model_ider) in FLX_IDERS_MAP
-        Hd_fun = Kd_ider == "D" ? Kd.val : Kd.uval
+        Kd_fun = Kd_ider == "D" ? Kd.val : Kd.uval
         for exp in EXPS
 
                 color = ider_colors[Kd_ider]
-                Hd_flx = abs(Hd_fun(Kd_ider, exp)) # every body is possitive here
+                Kd_flx = abs(Kd_fun(Kd_ider, exp)) # every body is possitive here
                 
                 # yield
                 model = LPDAT[YIELD, :model, exp]
                 yout = LPDAT[YIELD, :yout, exp]
 
                 ymax_flx = ChU.av(model, yout, model_ider)
-                scatter!(yield_p, [Hd_flx], [ymax_flx]; ms = 8,
+                scatter!(yield_p, [Kd_flx], [ymax_flx]; ms = 8,
                     color, alpha = 0.6, label = ""
                 )
 
@@ -174,11 +186,11 @@ let
                     fbaout = LPDAT[fba_type, :fbaout, exp]
                     
                     fba_flx = ChU.av(model, fbaout, model_ider)
-                    scatter!(p, [Hd_flx], [fba_flx]; ms = 8,
+                    scatter!(p, [Kd_flx], [fba_flx]; ms = 8,
                         color, alpha = 0.6, label = ""
                     )
-                    m = minimum([m, Hd_flx, ymax_flx, fba_flx])
-                    M = maximum([M, Hd_flx, ymax_flx, fba_flx])
+                    m = minimum([m, Kd_flx, ymax_flx, fba_flx])
+                    M = maximum([M, Kd_flx, ymax_flx, fba_flx])
                 end
 
         end
@@ -190,10 +202,88 @@ let
             ls = :dash, color = :black, label = "")
     end
     
-    pname = "tot_corr"
-    mysavefig(ps, pname; layout = (1, 3))
+    pname = "flx_tot_corr"
+    layout = (1, 3)
+    mysavefig(ps, pname; layout)
 end
 
+## -----------------------------------------------------------------------------------------------
+# conc correlations
+let
+    yield_p = plot(title = "yield tot corrs"; xlabel = "exp conc", ylabel = "model conc")
+    open_fba_p = plot(title = "open fba tot corrs"; xlabel = "exp conc", ylabel = "model conc")
+    bounded_fba_p = plot(title = "bounded fba tot corrs"; xlabel = "exp conc", ylabel = "model conc")
+    
+    margin, m, M = -Inf, Inf, -Inf
+    for (Kd_ider, model_ider) in FLX_IDERS_MAP
+        Kd_ider == ["D", "CO2", "O2"] && continue
+        for exp in EXPS
+
+                color = ider_colors[Kd_ider]
+                Kd_sval = Kd.sval(Kd_ider, exp)
+                Kd_cval = Kd.cval(Kd_ider, exp, 0.0)
+                exp_xi = Kd.val(:xi, exp)
+
+                # yield
+                !haskey(LPDAT, YIELD, :model, exp) && continue
+                model = LPDAT[YIELD, :model, exp]
+                yout = LPDAT[YIELD, :yout, exp]
+
+                # conc (s = c + u*xi)
+                ymax_flx = ChU.av(model, yout, model_ider)
+                ymax_sval =  max(Kd_cval + SENSE[Kd_ider] * ymax_flx * exp_xi, 0.0)
+                scatter!(yield_p, [Kd_sval], [ymax_sval]; ms = 8,
+                    color, alpha = 0.6, label = ""
+                )
+
+                # bounded fba
+                for (fba_type, p) in [(FBA_BOUNDED, bounded_fba_p) , 
+                                    (FBA_OPEN, open_fba_p)]
+
+                    model = LPDAT[fba_type, :model, exp]
+                    fbaout = LPDAT[fba_type, :fbaout, exp]
+                    
+                    # conc (s = c + u*xi)
+                    fba_flx = ChU.av(model, fbaout, model_ider)
+                    fba_sval = Kd_cval == 0 ? fba_flx * exp_xi :
+                        max(Kd_cval - fba_flx * exp_xi, 0.0)
+                    scatter!(p, [Kd_sval], [fba_sval]; ms = 8,
+                        color, alpha = 0.6, label = ""
+                    )
+                    m = minimum([m, Kd_sval, ymax_sval, fba_sval])
+                    M = maximum([M, Kd_sval, ymax_sval, fba_sval])
+                end
+
+        end
+    end
+    margin = abs(M - m) * 0.1
+    ps = [yield_p, bounded_fba_p, open_fba_p]
+    for p in ps
+        plot!(p, [m - margin, M + margin], [m - margin, M + margin]; 
+            ls = :dash, color = :black, label = "")
+    end
+    
+    pname = "conc_tot_corr"
+    layout = (1, 3)
+    mysavefig(ps, pname; layout)
+end
+
+## -------------------------------------------------------------------
+# join flx correlations
+let
+    figdir = iJR.MODEL_FIGURES_DIR
+    for (lp_p, ep_p, join_name) in [
+        ("3.1_flx_tot_corr.png", "2.1_flx_tot_corr.png", "flx_join_corr.png"),
+        ("3.1_conc_tot_corr.png", "2.1_conc_tot_corr.png", "conc_join_corr.png"),
+    ] 
+        lp_img = FileIO.load(joinpath(figdir, lp_p))
+        ep_img = FileIO.load(joinpath(figdir, ep_p))
+        join_p = UJL.make_grid([lp_img, ep_img])
+        fname = joinpath(figdir, join_name)
+        FileIO.save(fname, join_p)
+        @info "Plotting" fname
+    end
+end
 ## -------------------------------------------------------------------
 # # # leyends
 # # # TODO fix this...
