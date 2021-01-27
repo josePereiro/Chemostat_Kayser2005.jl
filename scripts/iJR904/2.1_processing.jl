@@ -22,13 +22,15 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     import Chemostat.LP.MathProgBase
 
     const Ch = Chemostat
-    const ChP = Ch.Plots
     const ChU = Ch.Utils
     const ChSS = Ch.SteadyState
     const ChLP = Ch.LP
     const ChEP = Ch.MaxEntEP
     const ChSU = Ch.SimulationUtils
 
+    import ChemostatPlots
+    const ChP = ChemostatPlots
+    
     import UtilsJL
     const UJL = UtilsJL
 
@@ -243,14 +245,19 @@ let
             ep_vals = DAT[method, :ep, dat_prefix, iders, EXPS]
             ep_errs = DAT[method, :eperr, dat_prefix, iders, EXPS]
             Kd_vals = DAT[method, :Kd, dat_prefix, iders, EXPS]
+            
+            diffsign = sign.(Kd_vals) .* sign.(ep_vals)
+            Kd_vals = abs.(Kd_vals) .* diffsign
+            ep_vals = abs.(ep_vals) .* diffsign
+
             color = [ider_colors[ider] for ider in iders, exp in EXPS]
             m, M = myminmax([ep_vals; Kd_vals])
 
             scatter_params = (;label = "", color, ms = 7, alpha = 0.7)
             # ep corr
             p1 = plot(title = "$(iJR.PROJ_IDER) (EP) $method", 
-                ylabel = "model $(dat_prefix)",
-                xlabel = "exp $(dat_prefix)", 
+                ylabel = "model signdiff $(dat_prefix)",
+                xlabel = "exp signdiff $(dat_prefix)", 
             )
             scatter!(p1, Kd_vals, ep_vals; xerr = ep_errs, scatter_params...)
             plot!(p1, [m,M], [m,M]; ls = :dash, color = :black, label = "")
@@ -317,10 +324,10 @@ let
     
     for (model_ider, Kd_ider) in zip(model_iders, Kd_iders)
         ps = Plots.Plot[]
-        ps2 = Plots.Plot[]
+        ps_bs = Plots.Plot[]
         for exp in EXPS
             p = plot(title = string(Kd_ider, " exp: ", exp))
-            p2 = plot(title = string(Kd_ider, " exp: ", exp))
+            p_bs = plot(title = string(Kd_ider, " exp: ", exp))
             margin, m, M = -Inf, Inf, -Inf
             Kd_av = Kd.val(Kd_ider, exp)
             
@@ -354,28 +361,27 @@ let
                         
                         alpha = 0.15
                         color = method_colors[method]
-                        ChP.plot_marginal!(p2, model, epout, model_ider; 
+                        ChP.plot_marginal!(p_bs, model, epout, model_ider; 
                             legend = false, color, alpha, lw = 1)
 
                         if beta == exp_beta
-                            # @info "At" Kd_ider exp
-                            ChP.plot_marginal!(p2, model, epout, model_ider; 
+                            ChP.plot_marginal!(p_bs, model, epout, model_ider; 
                                 legend = false, color, 
                                 alpha = 1.0, lw = 3
                             )
                             break
                         end
                     end
-                    push!(ps2, p2)
+                    push!(ps_bs, p_bs)
                 end
 
             end
             # Experimental
             vline!(p, [Kd_av]; label = "", lw = 6, color = :black, alpha = 0.3)
-            vline!(p2, [Kd_av]; label = "", lw = 6, color = :black, alpha = 0.3)
+            vline!(p_bs, [Kd_av]; label = "", lw = 6, color = :black, alpha = 0.3)
             
             plot!(p; xlim = [m - margin, M + margin], size)
-            plot!(p2; xlim = [m - margin, M + margin], size)
+            plot!(p_bs; xlim = [m - margin, M + margin], size)
             push!(ps, p)
         end
 
@@ -385,7 +391,7 @@ let
             vals = [Kd.val(k, exp) for exp in EXPS]
             p = bar!(p, EXPS, vals; title = k, label = "", xticks)
             push!(ps, p)
-            push!(ps2, p)
+            push!(ps_bs, p)
         end
 
         pname = string(Kd_ider, "_marginals")
@@ -393,8 +399,90 @@ let
 
         method = EXPECTED
         pname = string(Kd_ider, "_marginals_vs_beta")
-        mysavefig(ps2, pname; method)
+        mysavefig(ps_bs, pname; method)
     end
+
+end 
+
+## -------------------------------------------------------------------
+# marginals v2
+let 
+    objider = iJR.KAYSER_BIOMASS_IDER
+    size = [300, 250]
+    Kd_mets_map = iJR.load_mets_map()
+    exch_met_map = iJR.load_exch_met_map()
+
+    # Iders
+    model_iders, Kd_iders = [objider], ["D"]
+    for Kd_met in CONC_IDERS
+        model_met = Kd_mets_map[Kd_met]
+        model_exch = exch_met_map[model_met]
+        push!(model_iders, model_exch)
+        push!(Kd_iders, string("u", Kd_met))
+    end
+    
+    for (model_ider, Kd_ider) in zip(model_iders, Kd_iders)
+        marg_params = (;xlabel = string(Kd_ider), yaxis = nothing, ylabel = "prob")
+
+        epps = Plots.Plot[]
+        exps = Plots.Plot[]
+        for method in [BOUNDED, EXPECTED, HOMO]
+            expp = plot(;title = string("Experimental"), marg_params...)
+            epp = plot(;title = string(" MaxEnt: ", method), marg_params...)
+            margin, m, M = -Inf, Inf, -Inf
+            
+            # EP
+            for exp in EXPS
+                Kd_av = Kd.val(Kd_ider, exp)
+                color = exp_colors[exp]    
+
+                datfile = INDEX[method, :DFILE, exp]
+                dat = deserialize(datfile)
+                model = dat[:model]
+                objidx = ChU.rxnindex(model, objider)
+                epouts = dat[:epouts]
+                exp_beta = maximum(keys(epouts))
+                epout = epouts[exp_beta]
+                ep_av = ChU.av(model, epout, model_ider)
+                ep_va = sqrt(ChU.va(model, epout, model_ider))
+                        
+                ChP.plot_marginal!(epp, model, [epout], model_ider; 
+                    legend = false, color, alpha = 0.8, lw = 3)
+                
+                m = minimum([m, ep_av, Kd_av])
+                M = maximum([M, ep_av, Kd_av])
+                margin = maximum([margin, 3 * ep_va])
+
+                # Experimental
+                vline!(expp, [Kd_av]; label = "", lw = 3, color, alpha = 0.8)
+                
+            end
+            
+            map([expp, epp]) do p
+                plot!(p; xlim = [m - margin, M + margin], size)
+            end
+
+            push!(epps, epp)
+            push!(exps, expp)
+        end
+
+        extras = Plots.Plot[]
+        for k in [:xi, :D, :sGLC]
+            p = plot(;title = "Experimental", size, 
+                xlabel = "rep", ylabel = string(k))
+            xticks =  (EXPS, string.(EXPS))
+            vals = [Kd.val(k, exp) for exp in EXPS]
+            color = [exp_colors[exp] for exp in EXPS]
+            p = bar!(p, EXPS, vals; label = "", xticks, color)
+            push!(extras, p)
+        end
+
+        ps = Plots.Plot[exps; epps; extras]
+        layout = (3, 3)
+        pname = string(Kd_ider, "_marginals_v2")
+        mysavefig(ps, pname; layout)
+
+    end # for (model_ider, Kd_ider)
 
 end 
 

@@ -174,6 +174,10 @@ let
                 yout = LPDAT[YIELD, :yout, exp]
 
                 ymax_flx = ChU.av(model, yout, model_ider)
+                diffsign = sign(Kd_flx) * sign(ymax_flx)
+                Kd_vals = abs(Kd_flx) * diffsign
+                ep_vals = abs(ymax_flx) * diffsign
+
                 scatter!(yield_p, [Kd_flx], [ymax_flx]; ms = 8,
                     color, alpha = 0.6, label = ""
                 )
@@ -216,7 +220,7 @@ let
     
     margin, m, M = -Inf, Inf, -Inf
     for (Kd_ider, model_ider) in FLX_IDERS_MAP
-        Kd_ider == ["D", "CO2", "O2"] && continue
+        Kd_ider in ["D", "CO2", "O2"] && continue
         for exp in EXPS
 
                 color = ider_colors[Kd_ider]
@@ -232,6 +236,7 @@ let
                 # conc (s = c + u*xi)
                 ymax_flx = ChU.av(model, yout, model_ider)
                 ymax_sval =  max(Kd_cval + SENSE[Kd_ider] * ymax_flx * exp_xi, 0.0)
+
                 scatter!(yield_p, [Kd_sval], [ymax_sval]; ms = 8,
                     color, alpha = 0.6, label = ""
                 )
