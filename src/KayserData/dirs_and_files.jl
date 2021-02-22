@@ -1,12 +1,11 @@
 # DIRS
 const KAYSER_RAW_DATA_DIR = joinpath(RAW_DATA_DIR, "Hayser2013")
 const KAYSER_PROCESSED_DATA_DIR = joinpath(PROCESSED_DATA_DIR, basename(KAYSER_RAW_DATA_DIR))
+const KAYSER_FIGURES_DIR = joinpath(FIGURES_DATA_DIR, basename(KAYSER_RAW_DATA_DIR))
 
 function _create_dirs()
-    for dir in [KAYSER_PROCESSED_DATA_DIR]
-        try; mkdir(dir)
-            catch err
-        end
+    for dir in [KAYSER_PROCESSED_DATA_DIR, KAYSER_FIGURES_DIR]
+        try; mkpath(dir); catch err; @warn("Error creating dir", dir, err); end
     end
 end
 

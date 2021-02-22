@@ -1,20 +1,22 @@
 import DrWatson: quickactivate
 quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
-import MAT
+@time begin
+    import MAT
 
-import SparseArrays
-import Chemostat_Kayser2005
-const ChK = Chemostat_Kayser2005
+    import SparseArrays
+    import Chemostat_Kayser2005
+    const ChK = Chemostat_Kayser2005
 
-const iJR = ChK.iJR904
-const Kd = ChK.KayserData # experimental data
-const Bd = ChK.BegData    # cost data
+    const iJR = ChK.iJR904
+    const Kd = ChK.KayserData # experimental data
+    const Bd = ChK.BegData    # cost data
 
-const Ch = ChK.Chemostat
-const ChU = Ch.Utils
-const ChSS = Ch.SteadyState
-const ChLP = Ch.LP
+    const Ch = ChK.Chemostat
+    const ChU = Ch.Utils
+    const ChSS = Ch.SteadyState
+    const ChLP = Ch.LP
+end
 
 ## ------------------------------------------------------------------
 # LOAD RAW MODEL

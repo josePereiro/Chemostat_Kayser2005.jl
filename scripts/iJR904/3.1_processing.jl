@@ -41,7 +41,7 @@ end
 
 ## -----------------------------------------------------------------------------------------------
 LPDAT = ChU.load_data(iJR.LP_DAT_FILE)
-const FBA_BOUNDED = :FBA_BOUNDEDs
+const FBA_BOUNDED = :FBA_BOUNDED
 const FBA_OPEN = :FBA_OPEN
 const YIELD = :YIELD
 
@@ -109,7 +109,7 @@ end
 # yield vs stuff
 let
     ps = Plots.Plot[]
-    for id in [:D, :cGLC, :xi, :uGLC]
+    for id in [:D, :cGLC, :xi, :uGLC, :sGLC]
         p = plot(;title = "yield vs $(id)", xlabel = "exp $id", ylabel = "yield")
         for exp in EXPS
             try
@@ -138,13 +138,18 @@ end
 
 ## -----------------------------------------------------------------------------------------------
 # correlations
+DAT = UJL.DictTree()
+DAT[:FLX_IDERS] = FLX_IDERS
+DAT[:CONC_IDERS] = CONC_IDERS
+DAT[:EXPS] = EXPS
+
+## -----------------------------------------------------------------------------------------------
 FLX_IDERS_MAP = Dict(
     "GLC" => "EX_glc_LPAREN_e_RPAREN__REV",
     "CO2" => "EX_co2_LPAREN_e_RPAREN_",
     "O2" => "EX_o2_LPAREN_e_RPAREN__REV",
     "AC" => "EX_ac_LPAREN_e_RPAREN_",
-    "NH4" => "EX_nh4_LPAREN_e_RPAREN__REV",
-    "D" => iJR.KAYSER_BIOMASS_IDER
+    "NH4" => "EX_nh4_LPAREN_e_RPAREN__REV"
 )
     
 SENSE = Dict(
@@ -152,9 +157,9 @@ SENSE = Dict(
     "CO2" => 1,
     "O2" => -1,
     "AC" => 1,
-    "NH4" => -1,
-    "D" => 1
+    "NH4" => -1
 )
+
 ## -----------------------------------------------------------------------------------------------
 # flx correlations
 let
@@ -163,11 +168,10 @@ let
     bounded_fba_p = plot(title = "bounded fba tot corrs"; xlabel = "exp flx", ylabel = "model flx")
     margin, m, M = -Inf, Inf, -Inf
     for (Kd_ider, model_ider) in FLX_IDERS_MAP
-        Kd_fun = Kd_ider == "D" ? Kd.val : Kd.uval
         for exp in EXPS
 
                 color = ider_colors[Kd_ider]
-                Kd_flx = abs(Kd_fun(Kd_ider, exp)) # every body is possitive here
+                Kd_flx = abs(Kd.uval(Kd_ider, exp)) # every body is possitive here
                 
                 # yield
                 model = LPDAT[YIELD, :model, exp]
@@ -175,8 +179,12 @@ let
 
                 ymax_flx = ChU.av(model, yout, model_ider)
                 diffsign = sign(Kd_flx) * sign(ymax_flx)
-                Kd_vals = abs(Kd_flx) * diffsign
-                ep_vals = abs(ymax_flx) * diffsign
+                diffsign = ifelse.(diffsign .== 0, 1.0, diffsign)
+                Kd_flx = abs(Kd_flx) * diffsign
+                ymax_flx = abs(ymax_flx) * diffsign
+
+                DAT[YIELD, :Kd, :flx, Kd_ider, exp] = Kd_flx
+                DAT[YIELD, :lp, :flx, Kd_ider, exp] = ymax_flx
 
                 scatter!(yield_p, [Kd_flx], [ymax_flx]; ms = 8,
                     color, alpha = 0.6, label = ""
@@ -190,6 +198,9 @@ let
                     fbaout = LPDAT[fba_type, :fbaout, exp]
                     
                     fba_flx = ChU.av(model, fbaout, model_ider)
+                    DAT[fba_type, :Kd, :flx, Kd_ider, exp] = Kd_flx
+                    DAT[fba_type, :lp, :flx, Kd_ider, exp] = fba_flx
+
                     scatter!(p, [Kd_flx], [fba_flx]; ms = 8,
                         color, alpha = 0.6, label = ""
                     )
@@ -237,6 +248,9 @@ let
                 ymax_flx = ChU.av(model, yout, model_ider)
                 ymax_sval =  max(Kd_cval + SENSE[Kd_ider] * ymax_flx * exp_xi, 0.0)
 
+                DAT[YIELD, :Kd, :conc, Kd_ider, exp] = Kd_sval
+                DAT[YIELD, :lp, :conc, Kd_ider, exp] = ymax_sval
+
                 scatter!(yield_p, [Kd_sval], [ymax_sval]; ms = 8,
                     color, alpha = 0.6, label = ""
                 )
@@ -252,6 +266,10 @@ let
                     fba_flx = ChU.av(model, fbaout, model_ider)
                     fba_sval = Kd_cval == 0 ? fba_flx * exp_xi :
                         max(Kd_cval - fba_flx * exp_xi, 0.0)
+
+                    DAT[fba_type, :Kd, :conc, Kd_ider, exp] = Kd_sval
+                    DAT[fba_type, :lp, :conc, Kd_ider, exp] = fba_sval
+        
                     scatter!(p, [Kd_sval], [fba_sval]; ms = 8,
                         color, alpha = 0.6, label = ""
                     )
@@ -274,6 +292,14 @@ let
 end
 
 ## -------------------------------------------------------------------
+# Inter project comunication
+let
+    CORR_DAT = isfile(iJR.CORR_DAT_FILE) ? ChU.load_data(iJR.CORR_DAT_FILE) : Dict()
+    CORR_DAT[:LP] = DAT
+    ChU.save_data(iJR.CORR_DAT_FILE, CORR_DAT)
+end
+
+## -------------------------------------------------------------------
 # join flx correlations
 let
     figdir = iJR.MODEL_FIGURES_DIR
@@ -289,6 +315,7 @@ let
         @info "Plotting" fname
     end
 end
+
 ## -------------------------------------------------------------------
 # # # leyends
 # # # TODO fix this...

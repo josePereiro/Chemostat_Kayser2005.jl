@@ -2,7 +2,7 @@
 module KayserData
 
     import ..Chemostat_Kayser2005: 
-        PROJ_ROOT, RAW_DATA_DIR, PROCESSED_DATA_DIR
+        PROJ_ROOT, RAW_DATA_DIR, PROCESSED_DATA_DIR, FIGURES_DATA_DIR
     import ..Chemostat_Kayser2005.Chemostat.Utils: 
         load_data, save_data
 

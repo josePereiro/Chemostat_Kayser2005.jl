@@ -20,7 +20,6 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     # julia Pkg REPL for installing the package
     import Chemostat
     import Chemostat.LP.MathProgBase
-
     const Ch = Chemostat
     const ChU = Ch.Utils
     const ChSS = Ch.SteadyState
@@ -50,7 +49,6 @@ INDEX = ChU.load_data(iJR.MAXENT_VARIANTS_INDEX_FILE; verbose = false);
 const HOMO = :HOMO
 const BOUNDED = :BOUNDED
 const EXPECTED = :EXPECTED
-const FBA = :FBA
 
 ## -------------------------------------------------------------------
 fileid = "2.1"
@@ -86,6 +84,10 @@ method_colors = Dict(
 DAT = ChU.DictTree()
 let 
     objider = iJR.KAYSER_BIOMASS_IDER
+    DAT[:CONC_IDERS] = CONC_IDERS
+    DAT[:FLX_IDERS] = FLX_IDERS
+    DAT[:EXPS] = EXPS
+
     exch_met_map = iJR.load_exch_met_map()
     Kd_mets_map = iJR.load_mets_map()
 
@@ -145,7 +147,6 @@ let
                 ep_av = DAT[method, :ep, :flx, Kd_met, exp]
                 # conc (s = c + u*xi)
                 c = Kd.val("c$Kd_met", exp, 0.0)
-                # fba_conc = max(c + fba_av * exp_xi, 0.0)
                 ep_conc = max(c + ep_av * exp_xi, 0.0)
                 Kd_conc = Kd.val("s$Kd_met", exp)
 
@@ -156,9 +157,16 @@ let
             end
 
         end # for exp in EXPS
-    
     end # for method
 
+end
+
+## -------------------------------------------------------------------
+# Inter project comunication
+let
+    CORR_DAT = isfile(iJR.CORR_DAT_FILE) ? ChU.load_data(iJR.CORR_DAT_FILE) : Dict()
+    CORR_DAT[:MAXENT_EP] = DAT
+    ChU.save_data(iJR.CORR_DAT_FILE, CORR_DAT)
 end
 
 ## -------------------------------------------------------------------
@@ -247,6 +255,7 @@ let
             Kd_vals = DAT[method, :Kd, dat_prefix, iders, EXPS]
             
             diffsign = sign.(Kd_vals) .* sign.(ep_vals)
+            diffsign = ifelse.(diffsign .== 0, 1.0, diffsign)
             Kd_vals = abs.(Kd_vals) .* diffsign
             ep_vals = abs.(ep_vals) .* diffsign
 
@@ -344,9 +353,7 @@ let
                 epout = epouts[exp_beta]
                 ep_av = ChU.av(model, epout, model_ider)
                 ep_va = sqrt(ChU.va(model, epout, model_ider))
-                # fbaout = dat[:fbaout]
                         
-                # ChP.plot_marginal!(p, model, [epout, fbaout], model_exch; legend = false)
                 ChP.plot_marginal!(p, model, [epout], model_ider; 
                     legend = false, color, alpha = 0.6, lw = 5)
                 
