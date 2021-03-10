@@ -87,11 +87,11 @@ DAT = ChU.DictTree()
 let 
     # CACHE
     DATfile = joinpath(iJR.MODEL_PROCESSED_DATA_DIR, "2.1_DAT.jls")
-    # if isfile(DATfile) 
-    #     global DAT = deserialize(DATfile) 
-    #     @info("DAT CACHE LOADED")
-    #     return
-    # end
+    if isfile(DATfile) 
+        global DAT = deserialize(DATfile) 
+        @info("DAT CACHE LOADED")
+        return
+    end
     DAT[:EXPS] = []
 
     objider = iJR.KAYSER_BIOMASS_IDER
