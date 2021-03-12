@@ -39,6 +39,7 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     using Plots, FileIO
     import GR
     GR.inline("png")
+    using Base.Threads
 
 end
 
@@ -51,7 +52,7 @@ const ME_Z_EXPECTED_G_MOVING    = :ME_Z_EXPECTED_G_MOVING
 const ME_Z_EXPECTED_G_BOUNDED = :ME_Z_EXPECTED_G_BOUNDED
 const ME_Z_FIXXED_G_BOUNDED = :ME_Z_FIXXED_G_BOUNDED
 
-ALL_MODELS = [ME_Z_OPEN_G_OPEN, ME_Z_EXPECTED_G_MOVING, ME_Z_EXPECTED_G_BOUNDED, ME_Z_FIXXED_G_BOUNDED]
+ALL_MODELS = [ME_Z_OPEN_G_OPEN, ME_Z_FIXXED_G_BOUNDED, ME_Z_EXPECTED_G_BOUNDED, ME_Z_EXPECTED_G_MOVING]
 
 # -------------------------------------------------------------------
 fileid = "2.1"
@@ -85,6 +86,9 @@ method_colors = Dict(
 # Collect
 DAT = ChU.DictTree()
 let 
+
+    WLOCK = ReentrantLock()
+
     # CACHE
     DATfile = joinpath(iJR.MODEL_PROCESSED_DATA_DIR, "2.1_DAT.jls")
     if isfile(DATfile) 
@@ -113,75 +117,95 @@ let
         push!(DAT[:EXPS], exp)
     end
 
-    ps_pool = Dict()
-    for exp in DAT[:EXPS], method in ALL_MODELS
+    # Feed jobs
+    Ch = Channel(1) do ch
+        for exp in DAT[:EXPS], method in ALL_MODELS
+            put!(ch, (exp, method))
+        end
+    end
+
+    nths = nthreads() - 1
+    @threads for thid in 1:nths
+        for (exp, method) in Ch
+                
+            !haskey(INDEX, method, :DFILE, exp) && continue
+            datfile = INDEX[method, :DFILE, exp]
+
+            dat = deserialize(datfile)
             
-        !haskey(INDEX, method, :DFILE, exp) && continue
-        datfile = INDEX[method, :DFILE, exp]
+            model = dat[:model]
+            objidx = ChU.rxnindex(model, objider)
+            epouts = dat[:epouts]
+            exp_beta = maximum(keys(epouts))
+            epout = epouts[exp_beta]
+            exp_xi = Kd.val(:xi, exp)
 
-        dat = deserialize(datfile)
-        
-        model = dat[:model]
-        objidx = ChU.rxnindex(model, objider)
-        epouts = dat[:epouts]
-        exp_beta = maximum(keys(epouts))
-        epout = epouts[exp_beta]
-        exp_xi = Kd.val(:xi, exp)
+            lock(WLOCK) do
+                @info("Doing", 
+                    exp, method, 
+                    length(dat[:epouts]), 
+                    epout.iter, thid
+                ); println()
+            end
 
-        println()
-        @info("Doing", exp, method, length(dat[:epouts]), epout.iter);
+            # Biomass
+            ep_biom = ChU.av(model, epout, objidx)
+            ep_std = sqrt(ChU.va(model, epout, objidx))
+            Kd_biom = Kd.val("D", exp)
+            
+            # store
+            lock(WLOCK) do
+                DAT[method, :ep   , :flx, objider, exp] = ep_biom
+                DAT[method, :eperr, :flx, objider, exp] = ep_std
+                DAT[method, :Kd   , :flx, objider, exp] = Kd_biom
+                DAT[:Kd   , :flx, objider, exp] = Kd_biom
+                DAT[method, :fva  , :flx, objider, exp] = ChU.bounds(model, objider)
+            end
+            
+            # fuxes
+            for Kd_met in FLX_IDERS
 
-        # Biomass
-        ep_biom = ChU.av(model, epout, objidx)
-        ep_std = sqrt(ChU.va(model, epout, objidx))
-        Kd_biom = Kd.val("D", exp)
-        
-        # store
-        DAT[method, :ep   , :flx, objider, exp] = ep_biom
-        DAT[method, :eperr, :flx, objider, exp] = ep_std
-        DAT[method, :Kd   , :flx, objider, exp] = Kd_biom
-        DAT[:Kd   , :flx, objider, exp] = Kd_biom
-        DAT[method, :fva  , :flx, objider, exp] = ChU.bounds(model, objider)
-        
-        # fuxes
-        for Kd_met in FLX_IDERS
+                    model_met = Kd_mets_map[Kd_met]
+                    model_exch = exch_met_map[model_met]
+                    model_exchi = ChU.rxnindex(model, model_exch)
 
-                model_met = Kd_mets_map[Kd_met]
-                model_exch = exch_met_map[model_met]
-                model_exchi = ChU.rxnindex(model, model_exch)
+                    proj = ChLP.projection2D(model, objider, model_exchi; l = 50)
+                    ep_av = ChU.av(model, epout, model_exchi)
+                    ep_std = sqrt(ChU.va(model, epout, model_exchi))
+                    Kd_flx = Kd.val("u$Kd_met", exp)
+                    
+                    lock(WLOCK) do
+                        DAT[method, :Kd, :flx, Kd_met, exp] = Kd_flx
+                        DAT[:Kd, :flx, Kd_met, exp] = Kd_flx
+                        DAT[method, :ep, :proj, Kd_met, exp] = proj
+                        DAT[method, :ep, :flx, Kd_met, exp] = ep_av
+                        DAT[method, :eperr, :flx, Kd_met, exp] = ep_std
+                        
+                        DAT[method, :fva , :flx, Kd_met, exp] = ChU.bounds(model, model_exch)
+                    end
 
-                proj = ChLP.projection2D(model, objider, model_exchi; l = 50)
-                ep_av = ChU.av(model, epout, model_exchi)
-                ep_std = sqrt(ChU.va(model, epout, model_exchi))
-                Kd_flx = Kd.val("u$Kd_met", exp)
-                
-                DAT[method, :Kd, :flx, Kd_met, exp] = Kd_flx
-                DAT[:Kd, :flx, Kd_met, exp] = Kd_flx
-                DAT[method, :ep, :proj, Kd_met, exp] = proj
-                DAT[method, :ep, :flx, Kd_met, exp] = ep_av
-                DAT[method, :eperr, :flx, Kd_met, exp] = ep_std
-                
-                DAT[method, :fva , :flx, Kd_met, exp] = ChU.bounds(model, model_exch)
+            end
 
-        end
+            # mets
+            for Kd_met in CONC_IDERS
 
-        # mets
-        for Kd_met in CONC_IDERS
+                ep_std = DAT[method, :eperr, :flx, Kd_met, exp] 
+                ep_av = DAT[method, :ep, :flx, Kd_met, exp]
+                # conc (s = c + u*xi)
+                c = Kd.val("c$Kd_met", exp, 0.0)
+                ep_conc = max(c + ep_av * exp_xi, 0.0)
+                Kd_conc = Kd.val("s$Kd_met", exp)
 
-            ep_std = DAT[method, :eperr, :flx, Kd_met, exp] 
-            ep_av = DAT[method, :ep, :flx, Kd_met, exp]
-            # conc (s = c + u*xi)
-            c = Kd.val("c$Kd_met", exp, 0.0)
-            ep_conc = max(c + ep_av * exp_xi, 0.0)
-            Kd_conc = Kd.val("s$Kd_met", exp)
+                lock(WLOCK) do
+                    DAT[method, :Kd, :conc, Kd_met, exp] = Kd_conc
+                    DAT[:Kd, :conc, Kd_met, exp] = Kd_conc
+                    DAT[method, :ep, :conc, Kd_met, exp] = ep_conc
+                    DAT[method, :eperr, :conc, Kd_met, exp] = ep_std * exp_xi
+                end
+            end
 
-            DAT[method, :Kd, :conc, Kd_met, exp] = Kd_conc
-            DAT[:Kd, :conc, Kd_met, exp] = Kd_conc
-            DAT[method, :ep, :conc, Kd_met, exp] = ep_conc
-            DAT[method, :eperr, :conc, Kd_met, exp] = ep_std * exp_xi
-        end
-
-    end # for exp in EXPS, for method
+        end # for (exp, method)
+    end # for thid
 
     # saving
     DAT[:EXPS] |> unique! |> sort!
@@ -288,15 +312,15 @@ let
     ps = Plots.Plot[]
     for method in ALL_MODELS
         p = plot(title = string(iJR.PROJ_IDER, " method: ", method), 
-            xlabel = "model biom", ylabel = "exp biom")
+            xlabel = "exp biom", ylabel = "model biom")
         ep_vals = DAT[method, :ep, :flx, objider, EXPS]
         eperr_vals = DAT[method, :eperr, :flx, objider, EXPS]
         Kd_vals = DAT[method, :Kd, :flx, objider, EXPS]
         color = [exp_colors[exp] for exp in EXPS]
         m, M = myminmax([Kd_vals; ep_vals])
         margin = abs(M - m) * 0.1
-        scatter!(p, ep_vals, Kd_vals; 
-            xerr = eperr_vals,
+        scatter!(p, Kd_vals, ep_vals; 
+            yerr = eperr_vals,
             label = "", color,
             alpha = 0.7, ms = 7,
             xlim = [m - margin, M + margin],
@@ -358,7 +382,7 @@ let
                 ylabel = "model signdiff $(dat_prefix)",
                 xlabel = "exp signdiff $(dat_prefix)", 
             )
-            scatter!(p1, Kd_vals, ep_vals; xerr = ep_errs, scatter_params...)
+            scatter!(p1, ep_vals, Kd_vals; yerr = ep_errs, scatter_params...)
             plot!(p1, [m,M], [m,M]; ls = :dash, color = :black, label = "")
             push!(ps, deepcopy(p1))
 

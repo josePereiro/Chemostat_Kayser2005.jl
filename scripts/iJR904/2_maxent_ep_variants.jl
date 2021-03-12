@@ -135,7 +135,7 @@ let
             reset_cache && UJL.delete_cache(epout_cid) 
             epout = ChU.load_cache(epout_cid; verbose = false)
 
-            for movround in 1:500
+            for movround in 1:1000
 
                 ## -------------------------------------------------------------------
                 # GRAD DESCEND
@@ -158,7 +158,7 @@ let
                         beta_vec,
                         alpha = Inf,
                         maxiter = 2000, 
-                        epsconv = 1e-3, 
+                        epsconv = 1e-4, 
                         verbose = false, 
                         solution = epout
                     )
@@ -220,12 +220,14 @@ let
                 
                 ## -------------------------------------------------------------------
                 # INFO AND CONV
-                conv = cgD_X <= vg_avPME && epout.status == ChEP.CONVERGED_STATUS
+                ep_growth = ChU.av(model, epout, iJR.KAYSER_BIOMASS_IDER)
+                gd_err = abs(exp_growth - ep_growth) / exp_growth
+                conv = cgD_X <= vg_avPME && epout.status == ChEP.CONVERGED_STATUS && gd_err < gd_th
                 
                 lock(WLOCK) do
                     @info("Round Done", 
                         movround, conv,
-                        dist, exglc_qta, Δexglc_lb,
+                        gd_err, exglc_qta, Δexglc_lb,
                         (vg_avPME, cgD_X), 
                         exglc_ub, exglc_lb,  exglc_L, 
                         thid
@@ -260,6 +262,70 @@ let
 
         end # for (exp, cGLC) in Ch
     end # for thid in 1:nthreads()
+end
+
+## -------------------------------------------------------------------
+# Further convergence
+let
+    method = ME_Z_EXPECTED_G_MOVING
+    objider = iJR.KAYSER_BIOMASS_IDER
+
+    iterator = Kd.val(:D) |> enumerate |> collect 
+    @threads for (exp, D) in iterator
+
+        datfile = INDEX[method, :DFILE, exp]
+        datfile == :unfeasible && continue
+        dat = deserialize(datfile)
+        model, epouts = ChU.uncompressed_model(dat[:model]) , dat[:epouts]
+
+        exp_growth = Kd.val(:D, exp)
+        exp_beta = dat[:exp_beta]
+        exp_epout = epouts[exp_beta]
+
+        lock(WLOCK) do
+            @info("Converging...", 
+                exp, method,
+                exp_beta, exp_epout.status, 
+                threadid()
+            ); println()
+        end
+        converg_status = get!(dat, :converg_status, :undone)
+        converg_status == :done && continue
+
+        model = ChLP.fva_preprocess(model; verbose = false, 
+            check_obj = iJR.KAYSER_BIOMASS_IDER
+        )
+        
+        new_epout = nothing
+        try
+            objidx = ChU.rxnindex(model, objider)
+            beta_vec = zeros(size(model, 2)); 
+            beta_vec[objidx] = exp_beta
+            new_epout = ChEP.maxent_ep(model; 
+                beta_vec, alpha = Inf, 
+                epsconv = 1e-5, verbose = false, 
+                solution = exp_epout, maxiter = 5000
+            )
+        catch err; @warn("ERROR", err); println() end
+
+        ep_growth = isnothing(new_epout) ? 0.0 : ChU.av(model, new_epout, objider)
+        fail = isnan(ep_growth) || ep_growth == 0.0 
+        epouts[exp_beta] = fail ? exp_epout : new_epout
+        
+        # Saving
+        lock(WLOCK) do
+            @info("Saving...", 
+                exp, method, 
+                exp_beta, 
+                new_epout.status,
+                new_epout.iter,
+                threadid()
+            ); println()
+        end
+        dat[:model] = ChU.compressed_model(model)
+        dat[:converg_status] = :done
+        serialize(datfile, dat)
+    end
 end
 
 ## -------------------------------------------------------------------
