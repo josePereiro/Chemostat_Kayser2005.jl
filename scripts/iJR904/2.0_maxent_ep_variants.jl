@@ -43,9 +43,15 @@ function dat_file(name; kwargs...)
 end
 
 ## -------------------------------------------------------------------
-function base_model(exp)
+function base_model(modelkey::String = "max_model")
     BASE_MODELS = ChU.load_data(iJR.BASE_MODELS_FILE; verbose = false);
-    model_dict = BASE_MODELS["fva_models"][exp]
+    model_dict = BASE_MODELS[modelkey]
+    ChU.MetNet(;model_dict...) |> ChU.uncompressed_model
+end
+
+function base_model(exp::Int, modelkey = "fva_models")
+    BASE_MODELS = ChU.load_data(iJR.BASE_MODELS_FILE; verbose = false);
+    model_dict = BASE_MODELS[modelkey][exp]
     ChU.MetNet(;model_dict...) |> ChU.uncompressed_model
 end
 
@@ -57,21 +63,38 @@ const ME_Z_EXPECTED_G_BOUNDED   = :ME_Z_EXPECTED_G_BOUNDED    # Match ME and Dy 
 const ME_Z_EXPECTED_G_MOVING    = :ME_Z_EXPECTED_G_MOVING     # 
 const ME_Z_FIXXED_G_BOUNDED     = :ME_Z_FIXXED_G_BOUNDED      # Fix biom around observed
 
+
+## -------------------------------------------------------------------
+function check_cache(datfile, exp, method)
+    thid = threadid()
+    if isfile(datfile)
+        lock(WLOCK) do
+            INDEX[method, :DFILE, exp] = datfile
+            @info("Cached loaded (skipping)",
+                exp, datfile, thid
+            )
+            println()
+        end
+        return true
+    end
+    return false
+end
+
 ## -------------------------------------------------------------------
 # ME_Z_EXPECTED_G_MOVING
-include("2.0.1_ME_Z_EXPECTED_G_MOVING.jl")
+# include("2.0.1_ME_Z_EXPECTED_G_MOVING.jl")
 
 ## -------------------------------------------------------------------
 # ME_Z_EXPECTED_G_BOUNDED
-include("2.0.2_ME_Z_EXPECTED_G_BOUNDED.jl")
+# include("2.0.2_ME_Z_EXPECTED_G_BOUNDED.jl")
 
 ## -------------------------------------------------------------------
 # ME_Z_FIXXED_G_BOUNDED
-include("2.0.3_ME_Z_FIXXED_G_BOUNDED.jl")
+# include("2.0.3_ME_Z_FIXXED_G_BOUNDED.jl")
 
 ## -------------------------------------------------------------------
 # ME_Z_OPEN_G_OPEN
-include("2.0.4_ME_Z_OPEN_G_OPEN.jl")
+# include("2.0.4_ME_Z_OPEN_G_OPEN.jl")
 
 ## -------------------------------------------------------------------
 # ME_MAX_POL

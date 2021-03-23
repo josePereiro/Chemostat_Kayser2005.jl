@@ -63,19 +63,19 @@ foreach(exchs) do idx
     ChU.lb!(model, idx, 0.0) # Closing all intakes
 end
 
-## -------------------------------------------------------------------
-# EXCHANGE METABOLITE MAP
-exch_met_map = Dict()
-for rxni in exchs
-    rxn = model.rxns[rxni]
-    metis = ChU.rxn_mets(model, rxni)
-    mets = model.mets[metis]
-    length(mets) != 1 && continue 
-    met = mets |> first
-    exch_met_map[rxn] = met
-    exch_met_map[met] = rxn
-end
-ChU.save_data(iJR.EXCH_MET_MAP_FILE, exch_met_map)
+# ## -------------------------------------------------------------------
+# # EXCHANGE METABOLITE MAP
+# exch_met_map = Dict()
+# for rxni in exchs
+#     rxn = model.rxns[rxni]
+#     metis = ChU.rxn_mets(model, rxni)
+#     mets = model.mets[metis]
+#     length(mets) != 1 && continue 
+#     met = mets |> first
+#     exch_met_map[rxn] = met
+#     exch_met_map[met] = rxn
+# end
+# ChU.save_data(iJR.EXCH_MET_MAP_FILE, exch_met_map)
 
 ## -------------------------------------------------------------------
 # ENZYMATIC COST INFO
@@ -191,15 +191,13 @@ for (exp, D) in Kd.val(:D) |> enumerate
     ## -------------------------------------------------------------------
     # prepare model
     model0 = deepcopy(model)
-    M, N = size(model0)
     exp_xi = Kd.val(:xi, exp)
-    intake_info = iJR.intake_info(exp)
-    ChSS.apply_bound!(model0, exp_xi, intake_info; 
+    exp_intake_info = iJR.intake_info(exp)
+    ChSS.apply_bound!(model0, exp_xi, exp_intake_info; 
         emptyfirst = true)
 
     ChK.test_fba(exp, model0, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
     fva_model = ChLP.fva_preprocess(model0, 
-        # eps = 1-9, # This avoid blocking totally any reaction
         check_obj = iJR.KAYSER_BIOMASS_IDER,
         verbose = true
     );
@@ -213,3 +211,51 @@ for (exp, D) in Kd.val(:D) |> enumerate
     ChU.save_data(iJR.BASE_MODELS_FILE, BASE_MODELS);
     GC.gc()
 end
+
+## -------------------------------------------------------------------
+# MAX MODEL
+let
+    # This model is bounded by the maximum rates found for EColi.
+    # Data From:
+    # Varma, (1993): 2465–73. https://doi.org/10.1128/AEM.59.8.2465-2473.1993.
+    # Extract max exchages from FIG 3 to form the maximum polytope
+
+    ChU.tagprintln_inmw("DOING MAX MODEL", 
+        "\n"
+    )
+
+    max_model = deepcopy(model)
+    
+    # Biomass
+    # 2.2 1/ h
+    ChU.bounds!(max_model, iJR.BIOMASS_IDER, 0.0, 2.2)
+    
+    Kd_rxns_map = iJR.load_Kd_rxns_map() 
+    # 40 mmol / gDW h
+    ChU.bounds!(max_model, Kd_rxns_map["GLC"], -40.0, 0.0)
+    # 45 mmol/ gDW
+    ChU.bounds!(max_model, Kd_rxns_map["AC"], 0.0, 40.0)
+    # 20 mmol/ gDW h
+    ChU.bounds!(max_model, Kd_rxns_map["O2"], -20.0, 0.0)
+    
+    # fva
+    max_model = ChLP.fva_preprocess(max_model, 
+        check_obj = iJR.KAYSER_BIOMASS_IDER,
+        verbose = true
+    );
+
+    ## -------------------------------------------------------------------
+    for (exp, D) in Kd.val(:D) |> enumerate
+        cgD_X = Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
+        ChU.lb!(max_model, iJR.GLC_EX_IDER, -cgD_X)
+        fbaout = ChLP.fba(max_model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+        biom = ChU.av(max_model, fbaout, iJR.KAYSER_BIOMASS_IDER)
+        cost = ChU.av(max_model, fbaout, iJR.COST_IDER)
+        @info("Test", exp, cgD_X, D, biom, cost); println()
+    end
+
+    ## -------------------------------------------------------------------
+    # saving
+    BASE_MODELS["max_model"] = compressed(max_model)
+    ChU.save_data(iJR.BASE_MODELS_FILE, BASE_MODELS);
+end;

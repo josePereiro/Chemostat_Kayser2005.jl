@@ -4,7 +4,7 @@
 ## ------------------------------------------------------------------
 # maps between Kayser2005 https://doi.org/10.1099/mic.0.27481-0.
 # data and the model
-function load_mets_map() 
+function load_Kd_mets_map() 
     Kd_mets_map = Dict()
     Kd_mets_map["GLC"] = "glc_DASH_D_e"
     Kd_mets_map["THM"] = "thm_e"
@@ -19,6 +19,21 @@ function load_mets_map()
     return Kd_mets_map
 end
 
+function load_Kd_rxns_map() 
+    Kd_rxns_map = Dict()
+    Kd_rxns_map["D"] = "KAYSER_BIOMASS_RXN"
+    Kd_rxns_map["AC"] = "EX_ac_LPAREN_e_RPAREN_"
+    Kd_rxns_map["NH4"] = "EX_nh4_LPAREN_e_RPAREN_"
+    Kd_rxns_map["GLC"] = "EX_glc_LPAREN_e_RPAREN_"
+    Kd_rxns_map["THM"] = "EX_thm_LPAREN_e_RPAREN_"
+    Kd_rxns_map["CO2"] = "EX_co2_LPAREN_e_RPAREN_"
+    Kd_rxns_map["CIT"] = "EX_cit_LPAREN_e_RPAREN_"
+    Kd_rxns_map["O2"] = "EX_o2_LPAREN_e_RPAREN_"
+    for (k, v) in Kd_rxns_map
+        Kd_rxns_map[v] = k
+    end
+    return Kd_rxns_map
+end
 
 ## ------------------------------------------------------------------
 # enzymatic costs

@@ -7,7 +7,7 @@ let
 
     # Feed jobs
     Ch = Channel(nthreads()) do ch
-        cGLCs = Fd.val("cGLC")
+        cGLCs = Kd.val("cGLC")
         for (exp, cGLC)  in enumerate(cGLCs)
             put!(ch, (exp, cGLC))
         end
@@ -16,6 +16,8 @@ let
     @threads for _ in 1:nthreads()
         thid = threadid()
         for (exp, cGLC) in Ch
+            # Excluded because of unfeasibility
+            exp in [1,2,3,4] && continue 
 
             ## -------------------------------------------------------------------
             # handle cache
@@ -24,13 +26,13 @@ let
 
             ## -------------------------------------------------------------------
             # SetUp
-            model =  load_model("max_model")
+            model =  base_model("max_model")
             M, N = size(model)
-            biomidx = ChU.rxnindex(model, iJR.BIOMASS_IDER)
+            biomidx = ChU.rxnindex(model, iJR.KAYSER_BIOMASS_IDER)
             glcidx = ChU.rxnindex(model, iJR.GLC_EX_IDER)
-            exp_growth = Fd.val("D", exp)
+            exp_growth = Kd.val("D", exp)
 
-            cgD_X = -Fd.cval(:GLC, exp) * Fd.val(:D, exp) / Fd.val(:X, exp)
+            cgD_X = -Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
             biom_beta = 0.0
             biom_betas = [biom_beta]
             vg_beta = 0.0
@@ -63,8 +65,8 @@ let
             biom_gddamp = 1.0
             vg_gddamp = 1.0
 
-            beta_step_len0 = 3
-            beta_step_scalef = 1.0
+            beta_scale_len0 = 3
+            beta_scale_factor = 1.0
 
             UJL.record!(mon) do dat
                 tdat = get!(dat, exp, Dict())
@@ -119,7 +121,7 @@ let
                             solution = epout
                         )
 
-                        biom_avPME = ChU.av(model, epout, iJR.BIOMASS_IDER)
+                        biom_avPME = ChU.av(model, epout, iJR.KAYSER_BIOMASS_IDER)
                         vg_avPME = ChU.av(model, epout, iJR.GLC_EX_IDER)
                         biom_diff = abs(biom_avPME - exp_growth)
                         vg_diff = abs(vg_avPME - cgD_X)
@@ -233,7 +235,7 @@ let
                                 solution = epout
                             )
         
-                            biom_avPME = ChU.av(model, epout, iJR.BIOMASS_IDER)
+                            biom_avPME = ChU.av(model, epout, iJR.KAYSER_BIOMASS_IDER)
                             vg_avPME = ChU.av(model, epout, iJR.GLC_EX_IDER)
                             biom_diff = abs(biom_avPME - exp_growth)
                             vg_diff = abs(vg_avPME - cgD_X)
@@ -324,14 +326,14 @@ let
                 
                 ## -------------------------------------------------------------------
                 # BETA SCALING
-                scalebeta = length(biom_betas) >= beta_step_len0 && 
-                    length(vg_betas) >= beta_step_len0 
+                scalebeta = length(biom_betas) >= beta_scale_len0 && 
+                    length(vg_betas) >= beta_scale_len0 
                 scalebeta && let
                     biom_beta_step = biom_betas[end] - biom_betas[end - 1]
-                    biom_beta += biom_beta_step * beta_step_scalef
+                    biom_beta += biom_beta_step * beta_scale_factor
 
                     vg_beta_step = vg_betas[end] - vg_betas[end - 1]
-                    vg_beta += vg_beta_step * beta_step_scalef
+                    vg_beta += vg_beta_step * beta_scale_factor
                 end
 
                 ## -------------------------------------------------------------------
