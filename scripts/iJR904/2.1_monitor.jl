@@ -26,12 +26,21 @@ mysavefig(p, pname; params...) =
 ## ----------------------------------------------------------------------------
 let
     mon = UJL.OnDiskMonitor(iJR.MODEL_CACHE_DIR, "monitor.jld2")
-    UJL.watch(mon; wt = 15.0) do ddat
 
+    UJL.watch(mon; wt = 15.0) do ddat
+        
         # vg_beta, biom_beta, 
         # biom_avPME, vg_avPME
+        live_proves = Dict()
         for (exp, tdat) in ddat
             method = get(tdat, :method, "")
+            
+            # Check activity
+            old_lprove = get!(live_proves, exp, -1.0)
+            new_lprove = get(tdat, :live_prove, -1.0)
+            old_lprove == new_lprove && continue
+            live_proves[:exp] = new_lprove
+
             for datk in [:round, :gd]
                 kdat = get!(tdat, datk, Dict())
                 ps = Plots.Plot[]
@@ -41,6 +50,8 @@ let
                             (:vg_avPME, :cgD_X), 
                             (:biom_avPME, :exp_growth), 
                         ]
+                    
+                    
                     avdat = get(kdat, avk, [])
                     p = plot(avdat;  title = string(avk), 
                         xlabel = "iter", ylabel = string(avk), 

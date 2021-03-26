@@ -31,8 +31,9 @@ let
             biomidx = ChU.rxnindex(model, iJR.KAYSER_BIOMASS_IDER)
             glcidx = ChU.rxnindex(model, iJR.GLC_EX_IDER)
             exp_growth = Kd.val("D", exp)
-
             cgD_X = -Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
+
+            # globals
             biom_beta = 0.0
             biom_betas = [biom_beta]
             vg_beta = 0.0
@@ -47,7 +48,7 @@ let
             epouts = Dict()
             epout = nothing
             epout_vgb0 = nothing
-            hasvalid_epout_moments = false
+            hasvalid_moments = false
             isbeta_stationary = false
             roundconv = false
 
@@ -60,11 +61,18 @@ let
             stth = 0.1
             smooth = 0.1
 
-            # This will be reduced every times damping is detected
+            # After a while without converge, accelarate
+            turbo_iter0 = 100
+            turbo_frec = 10
+            turbo_factor = 2.0
+
+            # damp will be reduced when detected
             damp_factor = 0.5
             biom_gddamp = 1.0
             vg_gddamp = 1.0
 
+            # the system converge ~log, so I push stuff a little
+            # every round
             beta_scale_len0 = 3
             beta_scale_factor = 1.0
 
@@ -79,11 +87,13 @@ let
             rounditer = 1
             maxrounds = 50
             function check_roundconv()
-                hasvalid_epout_moments = abs(vg_avPME - cgD_X)/abs(cgD_X) <= roundth && 
-                    abs(biom_avPME - exp_growth)/abs(exp_growth) <= roundth
+                hasvalid_biom_moment = abs(biom_avPME - exp_growth)/abs(exp_growth) <= roundth
+                hasvalid_vg_moment = abs(vg_avPME) <= abs(cgD_X) || 
+                    abs(vg_avPME - cgD_X)/abs(cgD_X) <= roundth
+                hasvalid_moments = hasvalid_biom_moment && hasvalid_vg_moment
                 isbeta_stationary = UJL.is_stationary(biom_betas, stth, stw) && 
                     UJL.is_stationary(vg_betas, stth, stw)
-                return hasvalid_epout_moments || isbeta_stationary
+                return hasvalid_moments || isbeta_stationary
             end
 
             while true
@@ -92,7 +102,7 @@ let
                 let
                     target = exp_growth
                     x0 = biom_beta
-                    maxΔx = max(abs(biom_beta) * 0.05, 5e3)
+                    maxΔx = max(abs(biom_beta) * 0.05, 1e4)
                     minΔx = maxΔx * 0.01
                     x1 = x0 + maxΔx * 0.01
                     senses = [] # To detect damping
@@ -146,6 +156,7 @@ let
 
                         UJL.record!(mon) do dat
                             tdat = get!(dat, exp, Dict())
+                            tdat[:live_prove] = rand()
                             gddat = get!(tdat, :gd, Dict())
                             UJL.get!push!(gddat; 
                                 vg_beta, biom_beta, 
@@ -153,6 +164,9 @@ let
                             )
                         end
                         
+                        # RUN OUT OF PATIENT
+                        (gdit >= 100 && rem(gdit, turbo_frec) == 0) && (gdmodel.maxΔx *= turbo_factor)
+                            
                         gdit += 1
                         return biom_avPME
                     end
@@ -259,12 +273,16 @@ let
 
                             UJL.record!(mon) do dat
                                 tdat = get!(dat, exp, Dict())
+                                tdat[:live_prove] = rand()
                                 gddat = get!(tdat, :gd, Dict())
                                 UJL.get!push!(gddat; 
                                     vg_beta, biom_beta, 
                                     biom_avPME, vg_avPME
                                 )
                             end
+
+                            # RUN OUT OF PATIENT
+                            (gdit >= 100 && rem(gdit, turbo_frec) == 0) && (gdmodel.maxΔx *= turbo_factor)
                             
                             gdit += 1
                             return vg_avPME
@@ -299,9 +317,26 @@ let
                 epouts[(biom_beta, vg_beta)] = epout
                 
                 ## -------------------------------------------------------------------
+                # CEHCK NAN
+                if any(isnan.(biom_betas)) || any(isnan.(vg_betas))
+                    @warn("Nan detected (BIG PROBLEMS HERE)", 
+                        exp, rounditer, 
+                        isbeta_stationary, hasvalid_moments,
+                        roundconv,
+                        epout.status, epout.iter, 
+                        (biom_avPME_vgb0, biom_avPME, exp_growth), biom_diff, 
+                        (vg_avPME_vgb0, vg_avPME, cgD_X), vg_diff, 
+                        (biom_beta, vg_beta), 
+                        thid
+                    ); println()
+                    break
+                end
+
+                ## -------------------------------------------------------------------
                 # MONITOR
                 UJL.record!(mon) do dat
                     tdat = get!(dat, exp, Dict())
+                    tdat[:live_prove] = rand()
                     rdat = get!(tdat, :round, Dict())
                     UJL.get!push!(rdat; 
                         vg_beta, biom_beta, 
@@ -314,7 +349,7 @@ let
                 lock(WLOCK) do
                     @info("Round Done", 
                         exp, rounditer, 
-                        isbeta_stationary, hasvalid_epout_moments,
+                        isbeta_stationary, hasvalid_moments,
                         roundconv,
                         epout.status, epout.iter, 
                         (biom_avPME_vgb0, biom_avPME, exp_growth), biom_diff, 
@@ -370,5 +405,4 @@ let
         end # for exp, cGLC
     end # for thid
     UJL.reset!(mon)
-
 end

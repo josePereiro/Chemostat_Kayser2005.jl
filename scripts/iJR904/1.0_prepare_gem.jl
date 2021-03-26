@@ -12,7 +12,8 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     const Kd = ChK.KayserData # experimental data
     const Bd = ChK.BegData    # cost data
 
-    const Ch = ChK.Chemostat
+    import Chemostat
+    const Ch = Chemostat
     const ChU = Ch.Utils
     const ChSS = Ch.SteadyState
     const ChLP = Ch.LP
@@ -122,13 +123,6 @@ model = ChU.split_revs(model;
 # ADDING COST REACCION
 cost_met_id = "cost"
 cost_exch_id = iJR.COST_IDER
-ChU.tagprintln_inmw("ADDING COST", 
-    "\ncosts to add: ", cost_info |> length,
-    "\nmin abs coe:  ", cost_info |> values .|> abs |> minimum,
-    "\nmax abs coe:  ", cost_info |> values .|> abs |> maximum,
-    "\ncost met id:  ", cost_met_id,
-    "\ncost exch id: ", cost_exch_id
-)
 
 M, N = size(model)
 cost_met = ChU.Met(cost_met_id, S = collect(values(cost_info)), rxns = collect(keys(cost_info)), b = 0.0)
@@ -136,6 +130,15 @@ model = ChU.expanded_model(model, M + 1, N + 1)
 ChU.set_met!(model, ChU.findempty(model, :mets), cost_met)
 cost_exch = ChU.Rxn(cost_exch_id, S = [1.0], mets = [cost_met_id], lb = -iJR.ABS_MAX_BOUND, ub = 0.0, c = 0.0)
 ChU.set_rxn!(model, ChU.findempty(model, :rxns), cost_exch);
+
+ChU.tagprintln_inmw("ADDING COST", 
+    "\ncosts to add:       ", cost_info |> length,
+    "\nmin abs coe:        ", cost_info |> values .|> abs |> minimum,
+    "\nmax abs coe:        ", cost_info |> values .|> abs |> maximum,
+    "\ncost met id:        ", cost_met_id,
+    "\ncost exch id:       ", cost_exch_id,
+    "\nChU.nzabs_range:    ", ChU.nzabs_range(model.S),
+)
 
 ## -------------------------------------------------------------------
 # SET BASE EXCHANGE
@@ -225,12 +228,23 @@ let
     )
 
     max_model = deepcopy(model)
+    base_nzabs_range = ChU.nzabs_range(max_model.S)
+    base_size = size(max_model)
     
-    # Biomass
-    # 2.2 1/ h
-    ChU.bounds!(max_model, iJR.BIOMASS_IDER, 0.0, 2.2)
+    # Scale model (reduce S ill-condition)
+    scale_factor = 1000.0
+    max_model = ChU.well_scaled_model(max_model, scale_factor)
+    
+    scl_size = size(max_model)
+    scl_nzabs_range = ChU.nzabs_range(max_model.S)
+    @info("Model", exp, 
+        base_size, base_nzabs_range, 
+        scl_size, scl_nzabs_range
+    ); println()
     
     Kd_rxns_map = iJR.load_Kd_rxns_map() 
+    # 2.2 1/ h # Biomass
+    ChU.bounds!(max_model, Kd_rxns_map["D"], 0.0, 2.2)
     # 40 mmol / gDW h
     ChU.bounds!(max_model, Kd_rxns_map["GLC"], -40.0, 0.0)
     # 45 mmol/ gDW
@@ -245,13 +259,19 @@ let
     );
 
     ## -------------------------------------------------------------------
+    test_model = deepcopy(max_model)
     for (exp, D) in Kd.val(:D) |> enumerate
         cgD_X = Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
-        ChU.lb!(max_model, iJR.GLC_EX_IDER, -cgD_X)
-        fbaout = ChLP.fba(max_model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
-        biom = ChU.av(max_model, fbaout, iJR.KAYSER_BIOMASS_IDER)
-        cost = ChU.av(max_model, fbaout, iJR.COST_IDER)
+        ChU.lb!(test_model, iJR.GLC_EX_IDER, -cgD_X)
+        fbaout = ChLP.fba(test_model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+        biom = ChU.av(test_model, fbaout, iJR.KAYSER_BIOMASS_IDER)
+        cost = ChU.av(test_model, fbaout, iJR.COST_IDER)
         @info("Test", exp, cgD_X, D, biom, cost); println()
+    end
+
+    for Kider in ["D", "GLC", "AC", "O2"]
+        bounds = ChU.bounds(max_model, Kd_rxns_map[Kider])
+        @info("Bound check", Kider, bounds)
     end
 
     ## -------------------------------------------------------------------

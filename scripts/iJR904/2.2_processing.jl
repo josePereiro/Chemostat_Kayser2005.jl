@@ -47,12 +47,19 @@ end
 INDEX = ChU.load_data(iJR.MAXENT_VARIANTS_INDEX_FILE; verbose = false);
 
 # -------------------------------------------------------------------
-const ME_Z_OPEN_G_OPEN = :ME_Z_OPEN_G_OPEN
-const ME_Z_EXPECTED_G_MOVING    = :ME_Z_EXPECTED_G_MOVING
-const ME_Z_EXPECTED_G_BOUNDED = :ME_Z_EXPECTED_G_BOUNDED
-const ME_Z_FIXXED_G_BOUNDED = :ME_Z_FIXXED_G_BOUNDED
+const ME_Z_OPEN_G_OPEN         = :ME_Z_OPEN_G_OPEN
+const ME_MAX_POL               = :ME_MAX_POL
+const ME_Z_EXPECTED_G_MOVING   = :ME_Z_EXPECTED_G_MOVING
+const ME_Z_EXPECTED_G_BOUNDED  = :ME_Z_EXPECTED_G_BOUNDED
+const ME_Z_FIXXED_G_BOUNDED    = :ME_Z_FIXXED_G_BOUNDED
 
-ALL_METHODS = [ME_Z_OPEN_G_OPEN, ME_Z_FIXXED_G_BOUNDED, ME_Z_EXPECTED_G_BOUNDED, ME_Z_EXPECTED_G_MOVING]
+ALL_METHODS = [
+    # ME_Z_OPEN_G_OPEN, 
+    ME_MAX_POL,
+    # ME_Z_FIXXED_G_BOUNDED, 
+    # ME_Z_EXPECTED_G_BOUNDED, 
+    # ME_Z_EXPECTED_G_MOVING
+]
 
 # -------------------------------------------------------------------
 fileid = "2.1"
@@ -78,13 +85,14 @@ ider_colors = Dict(
 
 method_colors = Dict(
     ME_Z_OPEN_G_OPEN => :red,
+    ME_MAX_POL => :blue,
     ME_Z_EXPECTED_G_BOUNDED => :orange,
     ME_Z_EXPECTED_G_MOVING => :purple,
-    ME_Z_FIXXED_G_BOUNDED => :blue,
+    ME_Z_FIXXED_G_BOUNDED => :green,
 )
 
-exch_met_map = iJR.load_exch_met_map()
-Kd_mets_map = iJR.load_mets_map()
+Kd_rxns_map = iJR.load_Kd_rxns_map()
+Kd_mets_map = iJR.load_Kd_mets_map()
 
 ## -------------------------------------------------------------------
 # Collect
@@ -167,7 +175,7 @@ let
             for Kd_met in FLX_IDERS
 
                     model_met = Kd_mets_map[Kd_met]
-                    model_exch = exch_met_map[model_met]
+                    model_exch = Kd_rxns_map[Kd_met]
                     model_exchi = ChU.rxnindex(model, model_exch)
 
                     proj = ChLP.projection2D(model, objider, model_exchi; l = 50)
@@ -313,7 +321,7 @@ let
             for ider in FLX_IDERS
 
                 model_met = Kd_mets_map[ider]
-                model_exch = exch_met_map[model_met]
+                model_exch = Kd_rxns_map[model_met]
                 model_exchi = ChU.rxnindex(model, model_exch)
 
                 model_flx = ChU.av(model, epout, model_exchi)
@@ -343,7 +351,7 @@ end
 ## -------------------------------------------------------------------
 # proj 2D
 let
-    method = ME_Z_EXPECTED_G_MOVING
+    method = ME_MAX_POL
     biom_ider = iJR.KAYSER_BIOMASS_IDER
 
     ps_pool = Dict()
@@ -550,16 +558,17 @@ end
 ## -------------------------------------------------------------------
 # marginal distributions
 let 
+
+    method2 = ME_MAX_POL
+
     objider = iJR.KAYSER_BIOMASS_IDER
     size = [300, 250]
-    Kd_mets_map = iJR.load_mets_map()
-    exch_met_map = iJR.load_exch_met_map()
 
     # Iders
     model_iders, Kd_iders = [objider], ["D"]
     for Kd_met in CONC_IDERS
         model_met = Kd_mets_map[Kd_met]
-        model_exch = exch_met_map[model_met]
+        model_exch = Kd_rxns_map[Kd_met]
         push!(model_iders, model_exch)
         push!(Kd_iders, string("u", Kd_met))
     end
@@ -574,7 +583,7 @@ let
             Kd_av = Kd.val(Kd_ider, exp)
             
             # EP
-            for method in [ME_Z_EXPECTED_G_BOUNDED, ME_Z_FIXXED_G_BOUNDED, ME_Z_OPEN_G_OPEN]
+            for method in ALL_METHODS
                 color = method_colors[method]    
 
                 datfile = INDEX[method, :DFILE, exp]
@@ -594,7 +603,7 @@ let
                 M = maximum([M, ep_av, Kd_av])
                 margin = maximum([margin, 3 * ep_va])
 
-                if method == ME_Z_FIXXED_G_BOUNDED
+                if method == method2
                     for (beta, epout) in sort(epouts; by = first)
                         ep_av = ChU.av(model, epout, model_ider)
                         ep_va = sqrt(ChU.va(model, epout, model_ider))
@@ -637,9 +646,8 @@ let
         pname = string(Kd_ider, "_marginals")
         mysavefig(ps, pname)
 
-        method = ME_Z_FIXXED_G_BOUNDED
         pname = string(Kd_ider, "_marginals_vs_beta")
-        mysavefig(ps_bs, pname; method)
+        mysavefig(ps_bs, pname; method2)
     end
 
 end 
@@ -649,14 +657,12 @@ end
 let 
     objider = iJR.KAYSER_BIOMASS_IDER
     size = [300, 250]
-    Kd_mets_map = iJR.load_mets_map()
-    exch_met_map = iJR.load_exch_met_map()
 
     # Iders
     model_iders, Kd_iders = [objider], ["D"]
     for Kd_met in CONC_IDERS
         model_met = Kd_mets_map[Kd_met]
-        model_exch = exch_met_map[model_met]
+        model_exch = Kd_rxns_map[Kd_met]
         push!(model_iders, model_exch)
         push!(Kd_iders, string("u", Kd_met))
     end
@@ -666,7 +672,7 @@ let
 
         epps = Plots.Plot[]
         exps = Plots.Plot[]
-        for method in [ME_Z_EXPECTED_G_BOUNDED, ME_Z_FIXXED_G_BOUNDED, ME_Z_OPEN_G_OPEN]
+        for method in ALL_METHODS
             expp = plot(;title = string("Experimental"), marg_params...)
             epp = plot(;title = string(" MaxEnt: ", method), marg_params...)
             margin, m, M = -Inf, Inf, -Inf
