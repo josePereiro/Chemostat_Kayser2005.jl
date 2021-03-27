@@ -175,6 +175,24 @@ ChK.test_fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
 model = ChU.fix_dims(model)
 
 ## -------------------------------------------------------------------
+function scale_model(model, scale_factor)
+    base_nzabs_range = ChU.nzabs_range(model.S)
+    base_size = size(model)
+    
+    # Scale model (reduce S ill-condition)
+    model = ChU.well_scaled_model(model, scale_factor)
+    
+    scl_size = size(model)
+    scl_nzabs_range = ChU.nzabs_range(model.S)
+
+    @info("Model", exp, 
+        base_size, base_nzabs_range, 
+        scl_size, scl_nzabs_range
+    ); println()
+    return model
+end
+
+## -------------------------------------------------------------------
 # FVA PREPROCESSING
 compressed(model) = model |> ChU.struct_to_dict |> ChU.compressed_copy
 const BASE_MODELS = isfile(iJR.BASE_MODELS_FILE) ? 
@@ -193,7 +211,9 @@ for (exp, D) in Kd.val(:D) |> enumerate
 
     ## -------------------------------------------------------------------
     # prepare model
-    model0 = deepcopy(model)
+    scale_factor = 1000.0
+    model0 = scale_model(deepcopy(model), scale_factor)
+    
     exp_xi = Kd.val(:xi, exp)
     exp_intake_info = iJR.intake_info(exp)
     ChSS.apply_bound!(model0, exp_xi, exp_intake_info; 
@@ -227,20 +247,8 @@ let
         "\n"
     )
 
-    max_model = deepcopy(model)
-    base_nzabs_range = ChU.nzabs_range(max_model.S)
-    base_size = size(max_model)
-    
-    # Scale model (reduce S ill-condition)
     scale_factor = 1000.0
-    max_model = ChU.well_scaled_model(max_model, scale_factor)
-    
-    scl_size = size(max_model)
-    scl_nzabs_range = ChU.nzabs_range(max_model.S)
-    @info("Model", exp, 
-        base_size, base_nzabs_range, 
-        scl_size, scl_nzabs_range
-    ); println()
+    max_model = scale_model(deepcopy(model), scale_factor)
     
     Kd_rxns_map = iJR.load_Kd_rxns_map() 
     # 2.2 1/ h # Biomass

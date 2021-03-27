@@ -75,7 +75,7 @@ let
 
            # the whole simulation converge as ~log, 
             # so I force betas increment by stepping
-            beta_scale_len0 = 3 # starting round for beta stepping
+            beta_scale_rounditer0 = 3 # starting round for beta stepping
             beta_scale_factor = 1.0 # stepping scaling factor
 
             rounditer = 1 # current round iter
@@ -102,8 +102,8 @@ let
             end
 
             ## -------------------------------------------------------------------
-            function print_info(msg, mac = @info; varargs...)
-                mac(msg, 
+            function print_info(msg; varargs...)
+                @info(msg, 
                     varargs...,
                     epout.status, epout.iter, 
                     (biom_avPME_vgb0, biom_avPME, exp_growth), biom_diff, 
@@ -164,6 +164,18 @@ let
             end
 
             while true
+
+                ## -------------------------------------------------------------------
+                # BETA SCALING
+                scalebeta = rounditer >= beta_scale_rounditer0
+                scalebeta && let
+                    biom_beta_step = biom_betas[end] - biom_betas[end - 1]
+                    biom_beta += biom_beta_step * beta_scale_factor
+
+                    vg_beta_step = vg_betas[end] - vg_betas[end - 1]
+                    vg_beta += vg_beta_step * beta_scale_factor
+                end
+
                 ## -------------------------------------------------------------------
                 # Z GRAD DESCEND: Match biomass momentums
                 let
@@ -265,7 +277,7 @@ let
                 ## -------------------------------------------------------------------
                 # CEHCK NAN
                 if any(isnan.(biom_betas)) || any(isnan.(vg_betas))
-                    print_info("Nan detected (BIG PROBLEMS HERE)", @warn; 
+                    print_info("Nan detected (BIG PROBLEMS HERE)"; 
                         exp, rounditer
                     )
                     break
@@ -289,18 +301,6 @@ let
                     print_info("Round Done"; exp, rounditer, 
                         hasvalid_moments, isbeta_stationary, roundconv
                     )
-                end
-                
-                ## -------------------------------------------------------------------
-                # BETA SCALING 
-                scalebeta = length(biom_betas) >= beta_scale_len0 && 
-                    length(vg_betas) >= beta_scale_len0 
-                scalebeta && let
-                    biom_beta_step = biom_betas[end] - biom_betas[end - 1]
-                    biom_beta += biom_beta_step * beta_scale_factor
-
-                    vg_beta_step = vg_betas[end] - vg_betas[end - 1]
-                    vg_beta += vg_beta_step * beta_scale_factor
                 end
 
                 ## -------------------------------------------------------------------
