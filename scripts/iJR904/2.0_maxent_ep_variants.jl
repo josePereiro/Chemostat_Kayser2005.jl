@@ -42,19 +42,6 @@ function dat_file(name; kwargs...)
     joinpath(iJR.MODEL_PROCESSED_DATA_DIR, fname)
 end
 
-## -------------------------------------------------------------------
-function base_model(modelkey::String = "max_model")
-    BASE_MODELS = ChU.load_data(iJR.BASE_MODELS_FILE; verbose = false);
-    model_dict = BASE_MODELS[modelkey]
-    ChU.MetNet(;model_dict...) |> ChU.uncompressed_model
-end
-
-function base_model(exp::Int, modelkey = "fva_models")
-    BASE_MODELS = ChU.load_data(iJR.BASE_MODELS_FILE; verbose = false);
-    model_dict = BASE_MODELS[modelkey][exp]
-    ChU.MetNet(;model_dict...) |> ChU.uncompressed_model
-end
-
 # -------------------------------------------------------------------
 # METHOD VARIANTS
 const ME_Z_OPEN_G_OPEN          = :ME_Z_OPEN_G_OPEN           # Do not use extra constraints

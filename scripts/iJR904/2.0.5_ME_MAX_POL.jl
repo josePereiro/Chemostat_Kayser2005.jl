@@ -26,7 +26,7 @@ let
 
             ## -------------------------------------------------------------------
             # SetUp
-            model =  base_model("max_model")
+            model =  iJR.load_model("max_model")
             M, N = size(model)
             biomidx = ChU.rxnindex(model, iJR.KAYSER_BIOMASS_IDER)
             glcidx = ChU.rxnindex(model, iJR.GLC_EX_IDER)

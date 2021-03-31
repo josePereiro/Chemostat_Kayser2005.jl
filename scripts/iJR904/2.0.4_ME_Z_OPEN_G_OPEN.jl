@@ -20,7 +20,7 @@ let
         end
 
         # setup
-        model = base_model(exp)
+        model = load_model(exp)
         objidx = ChU.rxnindex(model, objider)
 
         exp_growth = Kd.val("D", exp)

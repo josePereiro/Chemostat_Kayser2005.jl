@@ -19,17 +19,36 @@ function _load_and_bundle()
     merge!(TABLE1 ,load_data(KAYSER_CONV_TABLE1_FILE; verbose=false))
     merge!(TABLE2 ,load_data(KAYSER_CONV_TABLE2_FILE; verbose=false))
 
+    # collect all in a single bundle
     for table in [TABLE1, TABLE2]
         for (id, dat) in table
             dict = get!(BUNDLE, id, Dict())
             dict["name"] = dat[1]
             dict["unit"] = dat[2]
             dict["vals"] = dat[3:end] .|> Float64
-            dict["D"] = table["D"][3:end] .|> Float64
         end
     end
-    BUNDLE["D"]["vals"] = sort(union(TABLE1["D"][3:end], TABLE2["D"][3:end]))
-    BUNDLE["D"]["D"] = BUNDLE["D"]["vals"]
+    BUNDLE["D"]["vals"] = TABLE1["D"][3:end]
+
+    # the gases exchanges are non reported 
+    # for the experiments [14, 15]...
+    # I computed from an extrapolation with the CTR and OTR.
+    for (uid, tid) in [("uCO2", "CTR"), ("uO2", "OTR")]
+        u = BUNDLE[uid]["vals"] # mmol/ g hr
+        tr = BUNDLE[tid]["vals"] # g/ L hr
+
+        # reported indexes
+        rep_idxs = 1:min(length(u), length(tr))
+
+        # u = m * tr
+        m = sum(u[rep_idxs] ./ tr[rep_idxs])/ length(rep_idxs)
+        infer_u = m .* tr
+        infer_u[rep_idxs] .= u[rep_idxs]
+        @assert length(infer_u) == length(tr)
+
+        BUNDLE[uid]["vals"] = infer_u
+    end
+
 
     let n = length(BUNDLE["D"]["vals"])
         for (id, dat) in MEDIUM
@@ -46,24 +65,36 @@ function _load_and_bundle()
     dict = get!(BUNDLE, "xi", Dict())
     dict["name"] = "Cell specific dilution rate"
     dict["unit"] = "gDW/ L hr"
-    dict["vals"] = BUNDLE["Xv"]["vals"] ./ BUNDLE["Xv"]["D"];
-    dict["D"] = BUNDLE["Xv"]["D"];
+    dict["vals"] = BUNDLE["Xv"]["vals"] ./ BUNDLE["D"]["vals"];
+
+    # exchage for exp 14 and 15 wans't directly reported
+    # I compute it using 0 = uX + (c - s)D
+    for met in [:AC, :GLC, :NH4]
+        for exp in [14, 15]
+            dict = get!(BUNDLE, string("u", met), Dict())
+            c = cval(met, exp, 0.0)
+            s = sval(met, exp)
+            D = val(:D, exp)
+            Xv = val(:Xv, exp)
+            u = -(c - s) * D / Xv
+            push!(dict["vals"], u)
+        end
+    end
+
+    
     BUNDLE
 end
 
 ## ------------------------------------------------------------------
 # API
-const EXPS = 1:15
+# We will drop exp 14 and 15 because 
+# poor carbon recovery    
+const EXPS = 1:13
 const msd_mets = ["AC", "GLC", "NH4"]
 const iders_to_plot = ["AC", "GLC", "NH4", "D"]
-val(dataid) = BUNDLE[string(dataid)]["vals"]
+val(dataid) = BUNDLE[string(dataid)]["vals"][EXPS]
 val(dataid, exp::Int) = val(dataid)[exp]
-function val(dataid, exp)
-    dat = BUNDLE[string(dataid)]
-    i = findfirst(dat["D"] .== exp)
-    val(dataid)[i]
-end
-val(dataid, exp, dflt) = try; return val(dataid, exp); catch err; (@warn(err); dflt) end
+val(dataid, exp, dflt) = try; return val(dataid, exp); catch err; dflt end
 
 cval(id, args...) = val("c$id", args...)
 sval(id, args...) = val("s$id", args...)
@@ -72,3 +103,5 @@ uval(id, args...) = val("u$id", args...)
 name(dataid) = BUNDLE[string(dataid)]["name"]
 unit(dataid) = BUNDLE[string(dataid)]["unit"]
 
+ciD_X(id) = [cval(id, exp, 0.0) * val(:D, exp) / val(:Xv, exp) for exp in EXPS]
+ciD_X(id, exp) = cval(id, exp, 0.0) * val(:D, exp) / val(:Xv, exp)

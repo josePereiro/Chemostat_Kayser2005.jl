@@ -14,7 +14,7 @@ let
         for (exp, D) in Ch
 
             # prepare model
-            model = base_model(exp)
+            model = load_model(exp)
             objidx = ChU.rxnindex(model, iJR.KAYSER_BIOMASS_IDER)
             M, N = size(model)
             exp_growth = Kd.val(:D, exp)

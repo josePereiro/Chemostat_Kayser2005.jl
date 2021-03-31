@@ -114,8 +114,7 @@ table2_converted["uCO2"][2:end] = ["mmol/ g hr"; table2["uCO2"][3:end] * 1e3 / 4
 table2_converted["uO2"][2:end] = ["mmol/ g hr"; -table2["uO2"][3:end] * 1e3 / 15.999];     # Uptake
 table2_converted["uAC"][2:end] = ["mmol/ g hr"; table2["uAC"][3:end] * 1e3 / 60.02];       # Formation
 table2_converted["uNH4"][2:end] = ["mmol/ g hr"; -table2["uNH4"][3:end] * 1e3 / 18];       # Uptake
-
-
+ 
 ## ------------------------------------------------------------------
 # MEDIUM
 """

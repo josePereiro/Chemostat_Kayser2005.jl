@@ -33,7 +33,9 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     import UtilsJL
     const UJL = UtilsJL
 
+    using ProgressMeter
     using Serialization
+    using Statistics
 
     # -------------------------------------------------------------------
     using Plots, FileIO
@@ -69,27 +71,9 @@ function mysavefig(p, pname; params...)
     @info("Plotting", fname)
 end
 myminmax(a::Vector) = (minimum(a), maximum(a))
-CONC_IDERS = ["GLC", "AC", "NH4"]
+# CONC_IDERS = ["GLC", "AC", "NH4"]
 FLX_IDERS = ["GLC", "CO2", "O2", "AC", "NH4"]
-
-exp_colors = let EXPS = 1:13
-    colors = Plots.distinguishable_colors(length(EXPS))
-    Dict(exp => color for (exp, color) in zip(EXPS, colors))
-end
-
-ider_colors = Dict(
-    "GLC" => :red, "CO2" => :yellow,
-    "O2" => :blue, "AC" => :orange, 
-    "NH4" => :green, "D" => :black,
-)
-
-method_colors = Dict(
-    ME_Z_OPEN_G_OPEN => :red,
-    ME_MAX_POL => :blue,
-    ME_Z_EXPECTED_G_BOUNDED => :orange,
-    ME_Z_EXPECTED_G_MOVING => :purple,
-    ME_Z_FIXXED_G_BOUNDED => :green,
-)
+# FLX_IDERS = ["GLC", "AC", "NH4"]
 
 Kd_rxns_map = iJR.load_Kd_rxns_map()
 Kd_mets_map = iJR.load_Kd_mets_map()
@@ -103,11 +87,11 @@ let
 
     # CACHE
     DATfile = joinpath(iJR.MODEL_PROCESSED_DATA_DIR, "2.1_DAT.jls")
-    if isfile(DATfile) 
-        global DAT = deserialize(DATfile) 
-        @info("DAT CACHE LOADED")
-        return
-    end
+    # if isfile(DATfile) 
+    #     global DAT = deserialize(DATfile) 
+    #     @info("DAT CACHE LOADED")
+    #     return
+    # end
     DAT[:EXPS] = []
 
     objider = iJR.KAYSER_BIOMASS_IDER
@@ -115,7 +99,7 @@ let
     DAT[:FLX_IDERS] = FLX_IDERS
 
     # Find exps
-    for exp in 1:13
+    for exp in Kd.EXPS
         ok = false
         for method in ALL_METHODS
             ok = haskey(INDEX, method, :DFILE, exp) &&
@@ -125,16 +109,20 @@ let
         !ok && continue
         push!(DAT[:EXPS], exp)
     end
+    max_model = iJR.load_model("max_model"; uncompress = false)
 
     # Feed jobs
-    Ch = Channel(1) do ch
+    nths = nthreads()
+    Ch = Channel(nths) do ch
         for exp in DAT[:EXPS], method in ALL_METHODS
             put!(ch, (exp, method))
         end
     end
 
-    nths = nthreads() - 1
+
     @threads for thid in 1:nths
+        thid = threadid()
+        thid == 1 && nths > 1 && continue
         for (exp, method) in Ch
                 
             !haskey(INDEX, method, :DFILE, exp) && continue
@@ -148,7 +136,8 @@ let
             exp_beta = maximum(keys(epouts)) # dat[:exp_beta]
             epout = epouts[exp_beta]
             exp_xi = Kd.val(:xi, exp)
-
+            fva_model = iJR.load_model("fva_models", exp; uncompress = false)
+            
             lock(WLOCK) do
                 @info("Doing", 
                     exp, method, 
@@ -161,6 +150,10 @@ let
             ep_biom = ChU.av(model, epout, objidx)
             ep_std = sqrt(ChU.va(model, epout, objidx))
             Kd_biom = Kd.val("D", exp)
+            max_lb, max_ub = ChU.bounds(max_model, objidx)
+            fva_lb, fva_ub = ChU.bounds(fva_model, objidx)
+            lb = max(max_lb, fva_lb)
+            ub = min(max_ub, fva_ub)
             
             # store
             lock(WLOCK) do
@@ -168,29 +161,33 @@ let
                 DAT[method, :eperr, :flx, objider, exp] = ep_std
                 DAT[method, :Kd   , :flx, objider, exp] = Kd_biom
                 DAT[:Kd   , :flx, objider, exp] = Kd_biom
-                DAT[method, :fva  , :flx, objider, exp] = ChU.bounds(model, objider)
+                DAT[method, :bounds, :flx, objider, exp] = (lb, ub)
             end
-            
-            # fuxes
+
+            # fluxes
             for Kd_met in FLX_IDERS
 
                     model_met = Kd_mets_map[Kd_met]
                     model_exch = Kd_rxns_map[Kd_met]
                     model_exchi = ChU.rxnindex(model, model_exch)
 
-                    proj = ChLP.projection2D(model, objider, model_exchi; l = 50)
                     ep_av = ChU.av(model, epout, model_exchi)
                     ep_std = sqrt(ChU.va(model, epout, model_exchi))
                     Kd_flx = Kd.val("u$Kd_met", exp)
+                    proj = ChLP.projection2D(model, objider, model_exchi; l = 50)
                     
+                    max_lb, max_ub = ChU.bounds(max_model, Kd_rxns_map[Kd_met])
+                    fva_lb, fva_ub = ChU.bounds(fva_model, Kd_rxns_map[Kd_met])
+                    lb = max(max_lb, fva_lb)
+                    ub = min(max_ub, fva_ub)
+                            
                     lock(WLOCK) do
                         DAT[method, :Kd, :flx, Kd_met, exp] = Kd_flx
                         DAT[:Kd, :flx, Kd_met, exp] = Kd_flx
                         DAT[method, :ep, :proj, Kd_met, exp] = proj
                         DAT[method, :ep, :flx, Kd_met, exp] = ep_av
                         DAT[method, :eperr, :flx, Kd_met, exp] = ep_std
-                        
-                        DAT[method, :fva , :flx, Kd_met, exp] = ChU.bounds(model, model_exch)
+                        DAT[method, :bounds, :flx, Kd_met, exp] = (lb, ub)
                     end
 
             end
@@ -222,12 +219,138 @@ let
 end
 EXPS = DAT[:EXPS]
 
-## -------------------------------------------------------------------
+exp_colors = let
+    colors = Plots.distinguishable_colors(length(EXPS))
+    Dict(exp => color for (exp, color) in zip(EXPS, colors))
+end
+
+ider_colors = Dict(
+    "GLC" => :red, "CO2" => :yellow,
+    "O2" => :blue, "AC" => :orange, 
+    "NH4" => :green, "D" => :black,
+)
+
+method_colors = Dict(
+    ME_Z_OPEN_G_OPEN => :red,
+    ME_MAX_POL => :blue,
+    ME_Z_EXPECTED_G_BOUNDED => :orange,
+    ME_Z_EXPECTED_G_MOVING => :purple,
+    ME_Z_FIXXED_G_BOUNDED => :green,
+)
+
+# -------------------------------------------------------------------
 # Inter project comunication
 let
     CORR_DAT = isfile(iJR.CORR_DAT_FILE) ? ChU.load_data(iJR.CORR_DAT_FILE) : Dict()
     CORR_DAT[:MAXENT_EP] = DAT
     ChU.save_data(iJR.CORR_DAT_FILE, CORR_DAT)
+end
+
+##  ----------------------------------------------------------------------------
+# pol vox volumen
+let
+    model0 = iJR.load_model("max_model")
+
+    bins = 50
+    Kd_rxns_map = iJR.load_Kd_rxns_map()
+    offsetf = 1.1
+    
+    exglcidx = ChU.rxnindex(model0, iJR.GLC_EX_IDER)
+    biomidx = ChU.rxnindex(model0, iJR.KAYSER_BIOMASS_IDER)
+    exglcL, exglcU = ChU.bounds(model0, exglcidx)
+    
+    maxD = maximum(Kd.val(:D)) * offsetf 
+    max_cgD_X = -maximum(Kd.ciD_X(:GLC)) * offsetf
+    
+    Ds = range(0.01, maxD; length = bins)
+    cgD_Xs = range(max_cgD_X, exglcU; length = bins)
+
+    box_vols = zeros(bins, bins) 
+    
+    Kd_ids = ["GLC", "AC", "NH4"]
+    model_ids = [Kd_rxns_map[Kd_id] for Kd_id in Kd_ids]
+    model_idxs = [ChU.rxnindex(model0, model_id) for model_id in model_ids]
+
+    # feeding task
+    nths = nthreads()
+    Ch = Channel(nths) do Ch_
+        @showprogress for (Di, D) in enumerate(Ds)
+            for (cgD_Xi, cgD_X) in enumerate(cgD_Xs)
+                put!(Ch_, (Di, D, cgD_Xi, cgD_X))
+            end
+        end 
+    end
+
+    # compute volume map
+    @threads for _ in 1:nths
+        thid = threadid()
+        thid == 1 && nths > 1 && continue
+        model = deepcopy(model0)
+        for (Di, D, cgD_Xi, cgD_X) in Ch
+            
+            # Reduce Pol
+            ChU.lb!(model, exglcidx, cgD_X)
+            ChU.bounds!(model, biomidx, D, D)
+            try
+                L, U = ChLP.fva(model, model_idxs)
+                vol = prod(abs.(L .- U))
+                box_vols[Di, cgD_Xi] = max(0.0, log10(vol + 1e-50))
+            catch
+                box_vols[Di, cgD_Xi] = NaN
+            end
+        end
+    end
+
+    # vol map
+    p = heatmap(Ds, cgD_Xs, box_vols'; 
+        title = "Polytope Box volume", label = "", 
+        xlabel = "D", ylabel = "cgD/ X"
+    )
+
+    # exp vals
+    exp_Ds = [Kd.val(:D, exp) for exp in EXPS]
+    exp_cgD_Xs = [-Kd.ciD_X(:GLC, exp) for exp in EXPS]
+    scatter!(p, exp_Ds, exp_cgD_Xs;
+        label = "exp", color = :white, 
+        m = 8
+    )
+
+    mysavefig(p, "pol_box_volume"; bins)
+end
+
+## -------------------------------------------------------------------
+# Var
+let
+    method = ME_MAX_POL
+
+    var_avs = Dict()
+    var_stds = Dict()
+    for exp in EXPS
+        datfile = INDEX[method, :DFILE, exp]
+        dat = deserialize(datfile)
+        
+        epouts = dat[:epouts]
+        exp_beta = maximum(keys(epouts))
+        epout = epouts[exp_beta]
+        
+        vas = ChU.va(epout)
+        var_avs[exp] = mean(vas)
+        var_stds[exp] = 0.0 #std(vas)
+    end
+
+    # sGLC
+    ids = [:D, :sAC, :sGLC, :sNH4, :Xv, :uAC, :uGLC, :uNH4]
+    for id in ids
+        p = scatter(;xlabel = string(id), ylabel = "avs log var")
+        xs = [Kd.val(id, exp) for exp in EXPS]
+        ys = [var_avs[exp] for exp in EXPS]
+        errs = [var_stds[exp] for exp in EXPS]
+        sids = sortperm(xs)
+        ys, errs = ys[sids], errs[sids]
+        scatter!(p, xs, ys; yerr = errs, label = "", color = :black, m = 8)
+        plot!(p, xs, ys; label = "", color = :black, lw = 3, alpha = 0.5)
+        mysavefig(p, string("av_log_var_vs_", id))
+    end
 end
 
 ## -------------------------------------------------------------------
@@ -292,76 +415,72 @@ let
     mysavefig(p, "MSE_per_ider")
 end
 
-## -------------------------------------------------------------------
-# MSE per beta
-let
-    method = ME_Z_EXPECTED_G_BOUNDED
+# ## -------------------------------------------------------------------
+# # MSE per beta
+# let
+#     method = ME_Z_EXPECTED_G_BOUNDED
 
-    ps = Plots.Plot[]
-    for exp in EXPS
-        p = plot(;title = string("exp: ", exp), 
-            xlabel = "beta", ylabel = "MSE"
-        )
+#     ps = Plots.Plot[]
+#     for exp in EXPS
+#         p = plot(;title = string("exp: ", exp), 
+#             xlabel = "beta", ylabel = "MSE"
+#         )
 
-        datfile = INDEX[method, :DFILE, exp]
-        dat = deserialize(datfile)
-        epouts = dat[:epouts]
-        betas = epouts |> keys |> collect |> sort
-        exp_beta = maximum(keys(epouts)) # dat[:exp_beta]
-        model = dat[:model]
+#         datfile = INDEX[method, :DFILE, exp]
+#         dat = deserialize(datfile)
+#         epouts = dat[:epouts]
+#         betas = epouts |> keys |> collect |> sort
+#         exp_beta = maximum(keys(epouts)) # dat[:exp_beta]
+#         model = dat[:model]
         
-        MSEs = []
-        for beta in betas
-            epout = epouts[beta]
+#         MSEs = []
+#         for beta in betas
+#             epout = epouts[beta]
 
-            sum = 0.0
-            N = 0
+#             sum = 0.0
+#             N = 0
 
-            glc_flx = Kd.uval(:GLC, exp)
-            for ider in FLX_IDERS
+#             glc_flx = Kd.uval(:GLC, exp)
+#             for ider in FLX_IDERS
 
-                model_met = Kd_mets_map[ider]
-                model_exch = Kd_rxns_map[model_met]
-                model_exchi = ChU.rxnindex(model, model_exch)
+#                 model_met = Kd_mets_map[ider]
+#                 model_exch = Kd_rxns_map[model_met]
+#                 model_exchi = ChU.rxnindex(model, model_exch)
 
-                model_flx = ChU.av(model, epout, model_exchi)
-                exp_flx = Kd.uval(ider, exp)
+#                 model_flx = ChU.av(model, epout, model_exchi)
+#                 exp_flx = Kd.uval(ider, exp)
 
-                sum += (model_flx/glc_flx - exp_flx/glc_flx)^2
-                N += 1
-            end
+#                 sum += (model_flx/glc_flx - exp_flx/glc_flx)^2
+#                 N += 1
+#             end
             
-            push!(MSEs, sum / N)
-        end
+#             push!(MSEs, sum / N)
+#         end
 
-        scatter!(p, betas, MSEs; color = :black,
-            label = "", m = 8, alpha = 0.8
-        )
-        plot!(p, betas, MSEs; color = :black,
-            label = "", ls = :dash, alpha = 0.8
-        )
-        vline!(p, [exp_beta]; color = :black, 
-            label = "", ls = :dot, lw = 3, alpha = 0.9
-        )
-        push!(ps, p)
-    end
-    mysavefig(ps, "MSE_vs_beta")
-end
+#         scatter!(p, betas, MSEs; color = :black,
+#             label = "", m = 8, alpha = 0.8
+#         )
+#         plot!(p, betas, MSEs; color = :black,
+#             label = "", ls = :dash, alpha = 0.8
+#         )
+#         vline!(p, [exp_beta]; color = :black, 
+#             label = "", ls = :dot, lw = 3, alpha = 0.9
+#         )
+#         push!(ps, p)
+#     end
+#     mysavefig(ps, "MSE_vs_beta")
+# end
 
 ## -------------------------------------------------------------------
 # proj 2D
 let
     method = ME_MAX_POL
     biom_ider = iJR.KAYSER_BIOMASS_IDER
+    exO2_ider = Kd_rxns_map["O2"]
 
     ps_pool = Dict()
     for exp in EXPS
 
-        datfile = INDEX[method, :DFILE, exp]
-        dat = deserialize(datfile)
-        
-        model = dat[:model]
-        
         for Kd_ider in FLX_IDERS
 
             # 2D Projection
@@ -372,9 +491,16 @@ let
             proj = DAT[method, :ep, :proj, Kd_ider, exp]
             ChP.plot_projection2D!(p, proj; l = 50)
 
-            # cgD/X
-            input = -Kd.cval(Kd_ider, exp, 0.0) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
-            hline!(p, [input]; lw = 3, color = :black, ls = :solid, label = "input")
+            # bounds
+            lb, ub =DAT[method, :bounds, :flx, Kd_ider, exp]
+            hline!(p, [lb]; lw = 3, 
+                label = "fva lb",
+                color = :blue, ls = :solid
+            )
+            hline!(p, [ub]; lw = 3,
+                label = "fva ub", 
+                color = :red, ls = :solid
+            )
 
             # EXPERIMENTAL FLXS
             exp_biom = DAT[method, :Kd, :flx, biom_ider, exp]
@@ -411,26 +537,26 @@ let
 end
 
 ## -------------------------------------------------------------------
-# beta vs stuff
-let
-    method = ME_Z_EXPECTED_G_MOVING
-    cGLC_plt = plot(;xlabel = "cGLC", ylabel = "beta")
-    D_plt = plot(;xlabel = "D", ylabel = "beta")
-    for exp in EXPS 
-        datfile = INDEX[method, :DFILE, exp]
-        dat = deserialize(datfile)
-        beta = maximum(keys(dat[:epouts]))
+# # beta vs stuff
+# let
+#     method = ME_Z_EXPECTED_G_MOVING
+#     cGLC_plt = plot(;xlabel = "cGLC", ylabel = "beta")
+#     D_plt = plot(;xlabel = "D", ylabel = "beta")
+#     for exp in EXPS 
+#         datfile = INDEX[method, :DFILE, exp]
+#         dat = deserialize(datfile)
+#         beta = maximum(keys(dat[:epouts]))
 
-        params = (;label = "", color = exp_colors[exp], 
-            alpha = 0.7, ms = 7
-        )
-        cGLC = Kd.val("cGLC", exp)
-        D = Kd.val("D", exp)
-        scatter!(cGLC_plt, [cGLC], [beta]; params...)
-        scatter!(D_plt, [D], [beta]; params...)
-    end
-    mysavefig([cGLC_plt, D_plt], "beta_vs_stuff"; method)
-end
+#         params = (;label = "", color = exp_colors[exp], 
+#             alpha = 0.7, ms = 7
+#         )
+#         cGLC = Kd.val("cGLC", exp)
+#         D = Kd.val("D", exp)
+#         scatter!(cGLC_plt, [cGLC], [beta]; params...)
+#         scatter!(D_plt, [D], [beta]; params...)
+#     end
+#     mysavefig([cGLC_plt, D_plt], "beta_vs_stuff"; method)
+# end
 
 ## -------------------------------------------------------------------
 # EP biomass corr
@@ -460,65 +586,82 @@ let
 end
 
 ## -------------------------------------------------------------------
-# flux vs beta
-let
-    objider = iJR.KAYSER_BIOMASS_IDER
-    method = ME_Z_EXPECTED_G_MOVING
-    p = plot(title = iJR.PROJ_IDER, xlabel = "beta", ylabel = "biom")
-    for exp in EXPS 
-        datfile = INDEX[method, :DFILE, exp]
-        dat = deserialize(datfile)
-        model = dat[:model]
-        objidx = ChU.rxnindex(model, objider)
-        epouts = dat[:epouts]
-        exp_beta = maximum(keys(epouts))
-        exp_xi = Kd.val("xi", exp)
-        scatter!(p, [exp_beta], [Kd.val("D", exp)], ms = 12, color = :white, label = "")
+# # flux vs beta
+# let
+#     objider = iJR.KAYSER_BIOMASS_IDER
+#     method = ME_Z_EXPECTED_G_MOVING
+#     p = plot(title = iJR.PROJ_IDER, xlabel = "beta", ylabel = "biom")
+#     for exp in EXPS 
+#         datfile = INDEX[method, :DFILE, exp]
+#         dat = deserialize(datfile)
+#         model = dat[:model]
+#         objidx = ChU.rxnindex(model, objider)
+#         epouts = dat[:epouts]
+#         exp_beta = maximum(keys(epouts))
+#         exp_xi = Kd.val("xi", exp)
+#         scatter!(p, [exp_beta], [Kd.val("D", exp)], ms = 12, color = :white, label = "")
 
-        betas = collect(keys(epouts)) |> sort
-        bioms = [ChU.av(model, epouts[beta], objidx) for beta in betas]
-        scatter!(p, betas, bioms, label = "", color = :black, alpha = 0.2)
+#         betas = collect(keys(epouts)) |> sort
+#         bioms = [ChU.av(model, epouts[beta], objidx) for beta in betas]
+#         scatter!(p, betas, bioms, label = "", color = :black, alpha = 0.2)
 
-    end
-    mysavefig(p, "obj_val_vs_beta"; method)
-end
+#     end
+#     mysavefig(p, "obj_val_vs_beta"; method)
+# end
 
 ## -------------------------------------------------------------------
-# total correlations
+# correlations
 let
-    for (dat_prefix, iders, zoom_lim) in [(:flx, FLX_IDERS, [-2.5, 2.5]), 
-                                            (:conc, CONC_IDERS, [0.0, 100.0])]
 
-        ps = Plots.Plot[]
-        for method in ALL_METHODS                                     
-            ep_vals = DAT[method, :ep, dat_prefix, iders, EXPS]
-            ep_errs = DAT[method, :eperr, dat_prefix, iders, EXPS]
-            Kd_vals = DAT[method, :Kd, dat_prefix, iders, EXPS]
+    tot_ps = Plots.Plot[]
+    for method in ALL_METHODS        
+        # total corr
+        let            
+            ep_vals = DAT[method, :ep, :flx, FLX_IDERS, EXPS] .|> abs
+            ep_errs = DAT[method, :eperr, :flx, FLX_IDERS, EXPS] .|> abs
+            Kd_vals = DAT[method, :Kd, :flx, FLX_IDERS, EXPS] .|> abs
             
-            diffsign = sign.(Kd_vals) .* sign.(ep_vals)
-            diffsign = ifelse.(diffsign .== 0, 1.0, diffsign)
-            Kd_vals = abs.(Kd_vals) .* diffsign
-            ep_vals = abs.(ep_vals) .* diffsign
-
-            color = [ider_colors[ider] for ider in iders, exp in EXPS]
-            m, M = myminmax([ep_vals; Kd_vals])
-
+            color = [ider_colors[ider] for ider in FLX_IDERS, exp in EXPS]
             scatter_params = (;label = "", color, ms = 7, alpha = 0.7)
             # ep corr
-            p1 = plot(title = "$(iJR.PROJ_IDER) (EP) $method", 
-                ylabel = "model signdiff $(dat_prefix)",
-                xlabel = "exp signdiff $(dat_prefix)", 
+            p = plot(title = "$(iJR.PROJ_IDER) (EP) $method", 
+                ylabel = "model abs flx",
+                xlabel = "exp abs flx", 
             )
-            scatter!(p1, ep_vals, Kd_vals; yerr = ep_errs, scatter_params...)
-            plot!(p1, [m,M], [m,M]; ls = :dash, color = :black, label = "")
-            push!(ps, deepcopy(p1))
-
+            scatter!(p, ep_vals, Kd_vals; yerr = ep_errs, scatter_params...)
+            all_vals = [ep_vals; Kd_vals] |> sort!
+            plot!(p, all_vals, all_vals; ls = :dash, color = :black, label = "")
+            push!(tot_ps, deepcopy(p))
         end
 
-        layout = (1, length(ps))
-        pname = string(dat_prefix, "_tot_corr")
-        mysavefig(ps, pname; layout)
+        # per ider
+        let       
+            for ider in FLX_IDERS
+                ep_vals = DAT[method, :ep, :flx, ider, EXPS] .|> abs
+                ep_errs = DAT[method, :eperr, :flx, ider, EXPS] .|> abs
+                Kd_vals = DAT[method, :Kd, :flx, ider, EXPS] .|> abs
+                
+                color = ider_colors[ider]
+                scatter_params = (;label = "", color, ms = 7, alpha = 0.7)
+                # ep corr
+                p = plot(title = "$(iJR.PROJ_IDER) (EP) $method", 
+                    ylabel = "model abs flx",
+                    xlabel = "exp abs flx", 
+                )
+                scatter!(p, ep_vals, Kd_vals; yerr = ep_errs, scatter_params...)
+                bounds = DAT[method, :bounds, :flx, ider, EXPS]
+                lb, ub = minimum(first.(bounds)), maximum(last.(bounds))
+                plot!(p, abs.([lb, ub]), abs.([lb, ub]); 
+                    ls = :dash, color = :black, label = "", 
+                    # xlim = [lb, ub], ylim = [lb, ub]
+                )
+                mysavefig(p, "corr"; ider, method)
+            end
+        end
     end
+
+    layout = (1, length(tot_ps))
+    mysavefig(tot_ps, "flx_tot_corr"; layout)
 
 end
 
@@ -537,16 +680,21 @@ let
 
         for method in ALL_METHODS
             color = method_colors[method]    
+
+            fva_ranges = DAT[method, :bounds, :flx, ider, EXPS]
+            for (exp, (lb, ub)) in zip(EXPS, fva_ranges)
+                plot!(p, [exp, exp], [lb, ub];  
+                    label = "", color, alpha = 0.1, ls = :solid, 
+                    lw = 50
+                )
+            end
             
             ep_vals = DAT[method, :ep, :flx, ider, EXPS]
             plot!(p, EXPS, ep_vals; 
-                label = string(method), color, alpha = 0.5, lw = 5, ls = :dash, xticks)
+                label = string(method), color, alpha = 0.5, 
+                lw = 5, ls = :dash, xticks
+            )
             
-            fva_ranges = DAT[method, :fva, :flx, ider, EXPS]
-            plot!(p, EXPS, last.(fva_ranges);  
-                label = "", color, alpha = 0.8, ls = :dot, lw = 3, xticks)
-            plot!(p, EXPS, first.(fva_ranges); 
-                label = "", color, alpha = 0.8, ls = :dot, lw = 3, xticks)
         end
         push!(ps, p)
     end

@@ -197,7 +197,7 @@ end
 compressed(model) = model |> ChU.struct_to_dict |> ChU.compressed_copy
 const BASE_MODELS = isfile(iJR.BASE_MODELS_FILE) ? 
     ChU.load_data(iJR.BASE_MODELS_FILE) : 
-    Dict("base_model" => compressed(model))
+    Dict("load_model" => compressed(model))
 for (exp, D) in Kd.val(:D) |> enumerate
 
     DAT = get!(BASE_MODELS, "fva_models", Dict())
