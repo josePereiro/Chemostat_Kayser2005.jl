@@ -5,7 +5,8 @@ module iJR904
     import ..Chemostat_Kayser2005: PROJ_ROOT, DATA_DIR, FIGURES_DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR
     import ..BegData
     const Bd = BegData
-    const ChU = Chemostat_Kayser2005.Chemostat.Utils
+    import Chemostat
+    const ChU = Chemostat.Utils
     import ..KayserData
     const Kd = KayserData
 
