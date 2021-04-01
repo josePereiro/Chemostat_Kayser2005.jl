@@ -1,9 +1,12 @@
 import DrWatson: quickactivate
 quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
-import Chemostat_Kayser2005: KayserData, Chemostat
-const Kd = KayserData
-const ChU = Chemostat.Utils
+# ------------------------------------------------------------------
+@time begin
+    import Chemostat_Kayser2005: KayserData, Chemostat
+    const Kd = KayserData
+    const ChU = Chemostat.Utils
+end
 
 ## ------------------------------------------------------------------
 # INFO
@@ -155,10 +158,13 @@ atpm = 2.81;
 ## ------------------------------------------------------------------
 # SAVING
 # Table1
-ChU.save_data(Kd.KAYSER_CONV_TABLE1_FILE, table1_converted)
+CONV_TABLE1_FILE = Kd.procdir("table1_conv.bson")
+ChU.save_data(CONV_TABLE1_FILE, table1_converted)
 
 # Table2
-ChU.save_data(Kd.KAYSER_CONV_TABLE2_FILE, table2_converted)
+CONV_TABLE2_FILE = Kd.procdir("table2_conv.bson")
+ChU.save_data(CONV_TABLE2_FILE, table2_converted)
 
 # Medium
-ChU.save_data(Kd.KAYSER_CONV_MEDIUM_FILE, medium_converted)
+CONV_MEDIUM_FILE = Kd.procdir("medium_conv.bson")
+ChU.save_data(CONV_MEDIUM_FILE, medium_converted)

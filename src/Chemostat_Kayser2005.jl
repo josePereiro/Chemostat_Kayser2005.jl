@@ -8,10 +8,18 @@ module Chemostat_Kayser2005
     const ChSS = Chemostat.SteadyState
     const ChLP = Chemostat.LP
 
+    import UtilsJL
+    const UJL = UtilsJL
+    UJL.gen_top_proj(@__MODULE__)
+
     include("Utils/Utils.jl")
     include("BegData/BegData.jl")
     include("KayserData/KayserData.jl")
     include("iJR904/iJR904.jl")
-    include("iJO1366/iJO1366.jl")
+    # include("iJO1366/iJO1366.jl")
+
+    function __init__()
+        UJL.create_proj_dirs(@__MODULE__)
+    end
 
 end # module

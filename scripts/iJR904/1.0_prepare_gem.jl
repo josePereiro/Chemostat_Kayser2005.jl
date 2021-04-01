@@ -21,7 +21,7 @@ end
 
 ## ------------------------------------------------------------------
 # LOAD RAW MODEL
-src_file = iJR.MODEL_RAW_MAT_FILE
+src_file = iJR.rawdir("iJR904.mat")
 mat_model = MAT.matread(src_file)["model"]
 model = ChU.MetNet(mat_model; reshape=true)
 ChU.tagprintln_inmw("MAT MODEL LOADED", 
@@ -194,9 +194,10 @@ end
 
 ## -------------------------------------------------------------------
 # FVA PREPROCESSING
+MODELS_FILE = iJR.procdir("base_models.bson")
 compressed(model) = model |> ChU.struct_to_dict |> ChU.compressed_copy
-const BASE_MODELS = isfile(iJR.BASE_MODELS_FILE) ? 
-    ChU.load_data(iJR.BASE_MODELS_FILE) : 
+const BASE_MODELS = isfile(MODELS_FILE) ? 
+    ChU.load_data(MODELS_FILE) : 
     Dict("load_model" => compressed(model))
 for (exp, D) in Kd.val(:D) |> enumerate
 
@@ -231,7 +232,7 @@ for (exp, D) in Kd.val(:D) |> enumerate
 
     ## -------------------------------------------------------------------
     # caching
-    ChU.save_data(iJR.BASE_MODELS_FILE, BASE_MODELS);
+    ChU.save_data(MODELS_FILE, BASE_MODELS);
     GC.gc()
 end
 
@@ -285,5 +286,5 @@ let
     ## -------------------------------------------------------------------
     # saving
     BASE_MODELS["max_model"] = compressed(max_model)
-    ChU.save_data(iJR.BASE_MODELS_FILE, BASE_MODELS);
+    ChU.save_data(MODELS_FILE, BASE_MODELS);
 end;

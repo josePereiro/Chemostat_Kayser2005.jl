@@ -11,13 +11,17 @@ function _load_and_bundle()
     empty!(TABLE1)
     empty!(TABLE2)
 
-    !isfile(KAYSER_CONV_MEDIUM_FILE) && return BUNDLE
-    !isfile(KAYSER_CONV_TABLE1_FILE) && return BUNDLE
-    !isfile(KAYSER_CONV_TABLE2_FILE) && return BUNDLE
+    CONV_MEDIUM_FILE = procdir("medium_conv.bson")
+    CONV_TABLE1_FILE = procdir("table1_conv.bson")
+    CONV_TABLE2_FILE = procdir("table2_conv.bson")
+
+    !isfile(CONV_MEDIUM_FILE) && return BUNDLE
+    !isfile(CONV_TABLE1_FILE) && return BUNDLE
+    !isfile(CONV_TABLE2_FILE) && return BUNDLE
     
-    merge!(MEDIUM, load_data(KAYSER_CONV_MEDIUM_FILE; verbose=false))
-    merge!(TABLE1 ,load_data(KAYSER_CONV_TABLE1_FILE; verbose=false))
-    merge!(TABLE2 ,load_data(KAYSER_CONV_TABLE2_FILE; verbose=false))
+    merge!(MEDIUM, UJL.load_data(CONV_MEDIUM_FILE; verbose=false))
+    merge!(TABLE1, UJL.load_data(CONV_TABLE1_FILE; verbose=false))
+    merge!(TABLE2, UJL.load_data(CONV_TABLE2_FILE; verbose=false))
 
     # collect all in a single bundle
     for table in [TABLE1, TABLE2]
@@ -69,19 +73,25 @@ function _load_and_bundle()
 
     # exchage for exp 14 and 15 wans't directly reported
     # I compute it using 0 = uX + (c - s)D
-    for met in [:AC, :GLC, :NH4]
+    for met in ["AC", "GLC", "NH4"]
         for exp in [14, 15]
-            dict = get!(BUNDLE, string("u", met), Dict())
-            c = cval(met, exp, 0.0)
-            s = sval(met, exp)
-            D = val(:D, exp)
-            Xv = val(:Xv, exp)
+            
+            # cval(met, exp, 0.0)
+            cdat = get(BUNDLE, string("c", met), Dict("vals" => Dict(exp => 0.0)))
+            c = cdat["vals"][exp]
+            # sval(met, exp, 0.0)
+            s = BUNDLE[string("s", met)]["vals"][exp] 
+            # val(:D, exp)
+            D = BUNDLE["D"]["vals"][exp]
+            # val(:Xv, exp)
+            Xv = BUNDLE["Xv"]["vals"][exp]
             u = -(c - s) * D / Xv
-            push!(dict["vals"], u)
+
+            udat = BUNDLE[string("u", met)]
+            push!(udat["vals"], u)
         end
     end
 
-    
     BUNDLE
 end
 

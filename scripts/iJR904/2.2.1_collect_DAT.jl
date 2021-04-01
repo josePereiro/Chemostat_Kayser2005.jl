@@ -94,8 +94,8 @@ let
                     Kd_flx = Kd.val("u$Kd_met", exp)
                     proj = ChLP.projection2D(model, objider, model_exchi; l = 50)
                     
-                    max_lb, max_ub = ChU.bounds(max_model, Kd_rxns_map[Kd_met])
-                    fva_lb, fva_ub = ChU.bounds(fva_model, Kd_rxns_map[Kd_met])
+                    max_lb, max_ub = ChU.bounds(max_model, model_exchi)
+                    fva_lb, fva_ub = ChU.bounds(fva_model, model_exchi)
                     lb = max(max_lb, fva_lb)
                     ub = min(max_ub, fva_ub)
                             
