@@ -16,7 +16,6 @@ module Chemostat_Kayser2005
     include("BegData/BegData.jl")
     include("KayserData/KayserData.jl")
     include("iJR904/iJR904.jl")
-    # include("iJO1366/iJO1366.jl")
 
     function __init__()
         UJL.create_proj_dirs(@__MODULE__)
