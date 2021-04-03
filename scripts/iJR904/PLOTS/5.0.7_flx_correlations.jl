@@ -1,7 +1,7 @@
 ## -------------------------------------------------------------------
 # EP biomass corr
 let
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
     ps = Plots.Plot[]
     for method in ALL_METHODS
         p = plot(title = string(iJR.PROJ_IDER, " method: ", method), 

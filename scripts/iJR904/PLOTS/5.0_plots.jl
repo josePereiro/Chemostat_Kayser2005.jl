@@ -54,8 +54,8 @@ function mysavefig(p, pname; params...)
 end
 myminmax(a::Vector) = (minimum(a), maximum(a))
 
-Kd_rxns_map = iJR.load_Kd_rxns_map()
-Kd_mets_map = iJR.load_Kd_mets_map()
+Kd_rxns_map = iJR.load_rxns_map()
+Kd_mets_map = iJR.load_mets_map()
 
 ## -------------------------------------------------------------------
 # Collect

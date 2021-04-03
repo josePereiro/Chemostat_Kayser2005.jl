@@ -173,7 +173,7 @@ function add_kayser_biomass(model::ChU.MetNet; UB = maximum(model.ub))
     # BIOMASS
     # r97) 1.12 PROTEIN + 0.56 RNA + LIPID + LPS + GLYC + PG + DNA + C1 + PA + 1/Y_X_ATP ATP = BIOMASS 
     # + 1/Y_X_ATP adp_c + 1/Y_X_ATP h_c + 1/Y_X_ATP pi_c + 1/Y_X_ATP ppi_c
-    KAYSER_BIOMASS_RXN = ChU.Rxn(KAYSER_BIOMASS_IDER; 
+    KAYSER_BIOMASS_RXN = ChU.Rxn(BIOMASS_IDER; 
         mets = [PROTEIN.id, RNA.id, LIPID.id, LPS.id, GLYC.id, PG.id, DNA.id, C1.id, PA.id, "atp_c", 
             "adp_c", "h_c", "pi_c"],
         S =    [ -1.12    , -0.56 , -1.0    , -1.0  , -1.0   , -1.0 , -1.0  , -1.0 ,  -1.0, -(1.0/Y_X_ATP) * 1e3,

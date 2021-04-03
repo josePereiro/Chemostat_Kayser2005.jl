@@ -30,7 +30,7 @@ ChU.tagprintln_inmw("MAT MODEL LOADED",
     "\nmodel size:       ", size(model),
     "\nChU.nzabs_range:      ", ChU.nzabs_range(model.S),
 )
-ChK.test_fba(model, iJR.BIOMASS_IDER; summary = false)
+ChK.test_fba(model, iJR.ORIG_BIOMASS_IDER; summary = false)
 
 ## -------------------------------------------------------------------
 # Set bounds
@@ -94,8 +94,8 @@ for rxn in model.rxns
     # The ChU.exchanges, the atpm and the biomass are synthetic reactions, so, 
     # they have should not have an associated enzimatic cost 
     any(startswith.(rxn, ["EX_", "DM_"])) && continue
+    rxn == iJR.ORIG_BIOMASS_IDER && continue
     rxn == iJR.BIOMASS_IDER && continue
-    rxn == iJR.KAYSER_BIOMASS_IDER && continue
     rxn == iJR.ATPM_IDER && continue
         
     # Only the internal, non reversible reactions have an associated cost
@@ -167,9 +167,9 @@ ChU.ub!(model, cost_exch_id, 1.0);
 ## -------------------------------------------------------------------
 ChU.tagprintln_inmw("ADDING KAYSER BIOMASS")
 # Adding kayser biomass equation
-ChU.bounds!(model, iJR.BIOMASS_IDER, 0.0, 0.0)
+ChU.bounds!(model, iJR.ORIG_BIOMASS_IDER, 0.0, 0.0)
 model = iJR.add_kayser_biomass(model; UB = 10 * iJR.ABS_MAX_BOUND)
-ChK.test_fba(model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+ChK.test_fba(model, iJR.BIOMASS_IDER, iJR.COST_IDER)
 
 ## -------------------------------------------------------------------
 model = ChU.fix_dims(model)
@@ -220,12 +220,12 @@ for (exp, D) in Kd.val(:D) |> enumerate
     ChSS.apply_bound!(model0, exp_xi, exp_intake_info; 
         emptyfirst = true)
 
-    ChK.test_fba(exp, model0, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+    ChK.test_fba(exp, model0, iJR.BIOMASS_IDER, iJR.COST_IDER)
     fva_model = ChLP.fva_preprocess(model0, 
-        check_obj = iJR.KAYSER_BIOMASS_IDER,
+        check_obj = iJR.BIOMASS_IDER,
         verbose = true
     );
-    ChK.test_fba(exp, fva_model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
+    ChK.test_fba(exp, fva_model, iJR.BIOMASS_IDER, iJR.COST_IDER)
     
     # storing
     DAT[exp] = compressed(fva_model)
@@ -251,7 +251,7 @@ let
     scale_factor = 1000.0
     max_model = scale_model(deepcopy(model), scale_factor)
     
-    Kd_rxns_map = iJR.load_Kd_rxns_map() 
+    Kd_rxns_map = iJR.load_rxns_map() 
     # 2.2 1/ h # Biomass
     ChU.bounds!(max_model, Kd_rxns_map["D"], 0.0, 2.2)
     # 40 mmol / gDW h
@@ -263,7 +263,7 @@ let
     
     # fva
     max_model = ChLP.fva_preprocess(max_model, 
-        check_obj = iJR.KAYSER_BIOMASS_IDER,
+        check_obj = iJR.BIOMASS_IDER,
         verbose = true
     );
 
@@ -271,9 +271,9 @@ let
     test_model = deepcopy(max_model)
     for (exp, D) in Kd.val(:D) |> enumerate
         cgD_X = Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
-        ChU.lb!(test_model, iJR.GLC_EX_IDER, -cgD_X)
-        fbaout = ChLP.fba(test_model, iJR.KAYSER_BIOMASS_IDER, iJR.COST_IDER)
-        biom = ChU.av(test_model, fbaout, iJR.KAYSER_BIOMASS_IDER)
+        ChU.lb!(test_model, iJR.EX_GLC_IDER, -cgD_X)
+        fbaout = ChLP.fba(test_model, iJR.BIOMASS_IDER, iJR.COST_IDER)
+        biom = ChU.av(test_model, fbaout, iJR.BIOMASS_IDER)
         cost = ChU.av(test_model, fbaout, iJR.COST_IDER)
         @info("Test", exp, cgD_X, D, biom, cost); println()
     end

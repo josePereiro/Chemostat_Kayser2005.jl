@@ -51,9 +51,9 @@ LPDAT = UJL.DictTree()
 ## -----------------------------------------------------------------------------------------------
 # FBA
 let
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
     costider = iJR.COST_IDER
-    exglcider = iJR.GLC_EX_IDER
+    exglcider = iJR.EX_GLC_IDER
     max_sense = -1.0
     min_sense = 1.0
 

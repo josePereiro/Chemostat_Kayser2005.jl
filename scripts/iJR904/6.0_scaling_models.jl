@@ -36,7 +36,7 @@ let
         model = ChU.load_data(iJR.BASE_MODEL_FILE)
         model = ChU.fix_dims(model)
         ChU.check_dims(model)
-        obj_ider = iJR.KAYSER_BIOMASS_IDER
+        obj_ider = iJR.BIOMASS_IDER
         fbaout = ChLP.fba(model, obj_ider)
         fba_growth = ChU.av(model, fbaout, obj_ider)
         @info "Orig model" exp size(model) ChU.nzabs_range(model.S) fba_growth

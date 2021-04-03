@@ -47,12 +47,12 @@ let
                 end
 
                 return ChLP.fva_preprocess(model0; 
-                    verbose = false, check_obj = iJR.KAYSER_BIOMASS_IDER
+                    verbose = false, check_obj = iJR.BIOMASS_IDER
                 )   
             end
-            objidx = ChU.rxnindex(model, iJR.KAYSER_BIOMASS_IDER)
+            objidx = ChU.rxnindex(model, iJR.BIOMASS_IDER)
             exp_growth = Kd.val("D", exp)
-            biom_lb, biom_ub = ChU.bounds(model, iJR.KAYSER_BIOMASS_IDER)
+            biom_lb, biom_ub = ChU.bounds(model, iJR.BIOMASS_IDER)
             if biom_ub < exp_growth
                 lock(WLOCK) do
                     INDEX[method, :DFILE, exp] = :unfeasible
@@ -64,7 +64,7 @@ let
                 continue
             end
             cgD_X = -Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
-            exglc_L = ChU.lb(model, iJR.GLC_EX_IDER)
+            exglc_L = ChU.lb(model, iJR.EX_GLC_IDER)
             exglc_qta = abs(exglc_L * 0.005)
             expβ = 0.0
             vg_avPME = 0.0
@@ -102,8 +102,8 @@ let
                     )
 
                     # ep_growth = ChU.av(epout)[objidx]
-                    ep_growth = ChU.av(model, epout, iJR.KAYSER_BIOMASS_IDER)
-                    vg_avPME = ChU.av(model, epout, iJR.GLC_EX_IDER)
+                    ep_growth = ChU.av(model, epout, iJR.BIOMASS_IDER)
+                    vg_avPME = ChU.av(model, epout, iJR.EX_GLC_IDER)
         
                     update = gd_it == 1 || abs(last_uptime - time()) > upfrec_time || 
                         epout.status != ChEP.CONVERGED_STATUS
@@ -136,7 +136,7 @@ let
                 ## -------------------------------------------------------------------
                 # MOVE V_UB
                 Δstep = 0.5
-                exglc_lb, exglc_ub = ChU.bounds(model, iJR.GLC_EX_IDER)
+                exglc_lb, exglc_ub = ChU.bounds(model, iJR.EX_GLC_IDER)
 
                 # vg_avPME = exglc_lb * 0.8
                 # lb is the uptake limit
@@ -147,11 +147,11 @@ let
                         max(exglc_L, exglc_lb + Δexglc_lb)
                     )
                 )
-                ChU.lb!(model, iJR.GLC_EX_IDER, exglc_lb)
+                ChU.lb!(model, iJR.EX_GLC_IDER, exglc_lb)
                 
                 ## -------------------------------------------------------------------
                 # INFO AND CONV
-                ep_growth = ChU.av(model, epout, iJR.KAYSER_BIOMASS_IDER)
+                ep_growth = ChU.av(model, epout, iJR.BIOMASS_IDER)
                 gd_err = abs(exp_growth - ep_growth) / exp_growth
                 conv = cgD_X <= vg_avPME && epout.status == ChEP.CONVERGED_STATUS && gd_err < gd_th
                 
@@ -200,7 +200,7 @@ end
 # Further convergence
 let
     method = ME_Z_EXPECTED_G_MOVING
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
 
     iterator = Kd.val(:D) |> enumerate |> collect 
     @threads for (exp, D) in iterator
@@ -225,7 +225,7 @@ let
         converg_status == :done && continue
 
         model = ChLP.fva_preprocess(model; verbose = false, 
-            check_obj = iJR.KAYSER_BIOMASS_IDER
+            check_obj = iJR.BIOMASS_IDER
         )
         
         new_epout = nothing

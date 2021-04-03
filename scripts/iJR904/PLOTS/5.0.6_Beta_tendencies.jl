@@ -24,7 +24,7 @@
 ## -------------------------------------------------------------------
 # # flux vs beta
 # let
-#     objider = iJR.KAYSER_BIOMASS_IDER
+#     objider = iJR.BIOMASS_IDER
 #     method = ME_Z_EXPECTED_G_MOVING
 #     p = plot(title = iJR.PROJ_IDER, xlabel = "beta", ylabel = "biom")
 #     for exp in EXPS 

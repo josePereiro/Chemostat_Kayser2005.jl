@@ -15,12 +15,12 @@ let
 
             # prepare model
             model = load_model(exp)
-            objidx = ChU.rxnindex(model, iJR.KAYSER_BIOMASS_IDER)
+            objidx = ChU.rxnindex(model, iJR.BIOMASS_IDER)
             M, N = size(model)
             exp_growth = Kd.val(:D, exp)
-            growth_ub = ChU.ub(model, iJR.KAYSER_BIOMASS_IDER)
+            growth_ub = ChU.ub(model, iJR.BIOMASS_IDER)
             feasible = exp_growth < growth_ub
-            biom_lb, biom_ub = ChU.bounds(model, iJR.KAYSER_BIOMASS_IDER)
+            biom_lb, biom_ub = ChU.bounds(model, iJR.BIOMASS_IDER)
             if biom_ub < exp_growth
                 lock(WLOCK) do
                     INDEX[method, :DFILE, exp] = :unfeasible
@@ -32,7 +32,7 @@ let
                 end
                 continue
             end
-            ChU.ub!(model, iJR.KAYSER_BIOMASS_IDER, growth_ub * 1.1) # open a beat helps EP
+            ChU.ub!(model, iJR.BIOMASS_IDER, growth_ub * 1.1) # open a beat helps EP
 
             lock(WLOCK) do
                 nzabs_range = ChU.nzabs_range(model.S)
@@ -164,7 +164,7 @@ end
 # Further convergence
 let
     method = ME_Z_EXPECTED_G_BOUNDED
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
 
     iterator = Kd.val(:D) |> enumerate |> collect 
     @threads for (exp, D) in iterator

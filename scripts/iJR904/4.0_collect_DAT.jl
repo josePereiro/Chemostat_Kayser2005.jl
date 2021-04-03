@@ -84,14 +84,14 @@ LP_DAT_FILE = iJR.procdir("lp_dat_file.bson")
 LP_DAT = ChU.load_data(LP_DAT_FILE; verbose = false);
 
 ## ----------------------------------------------------------------------------------
-Kd_mets_map = iJR.load_Kd_mets_map()
-Kd_rxns_map = iJR.load_Kd_rxns_map()
+Kd_mets_map = iJR.load_mets_map()
+Kd_rxns_map = iJR.load_rxns_map()
 
 ## ----------------------------------------------------------------------------------
 # COMMON DAT
 let
     max_model = iJR.load_model("max_model"; uncompress = false)
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
 
     for exp in EXPS
         # exp dat
@@ -120,7 +120,7 @@ let
             fva_lb, fva_ub = ChU.bounds(fva_model, model_exch)
             lb = max(max_lb, fva_lb)
             ub = min(max_ub, fva_ub)
-            DAT[:bounds, model_exch, exp] = (lb, ub)
+            DAT[:bounds, Kd_ider, exp] = (lb, ub)
 
         end
     end
@@ -130,7 +130,7 @@ end
 # MAXENT DAT
 let 
     WLOCK = ReentrantLock()
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
 
     # Feed jobs
     nths = nthreads()
@@ -197,7 +197,7 @@ end
 ## ----------------------------------------------------------------------------------
 # LP DAT
 let
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
 
     for method in LP_METHODS
             
@@ -224,5 +224,5 @@ let
 end
 
 ## ----------------------------------------------------------------------------------
-DAT_FILE = "dat.bson"
+DAT_FILE = iJR.procdir("dat.bson")
 UJL.save_data(DAT_FILE, DAT)

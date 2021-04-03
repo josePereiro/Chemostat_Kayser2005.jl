@@ -60,7 +60,7 @@ function _plot_biomass_vs_beta(SDATA, fpreffix)
         p = plot(;xlabel = "beta", ylabel = "biomass", 
             title = string(iJR.PROJ_IDER, " exp_", exp))
         model = D["model"]
-        obj_val = iJR.KAYSER_BIOMASS_IDER
+        obj_val = iJR.BIOMASS_IDER
 
         exp_growth = Kd.val(:D, exp)
         fbaout = D["fbaout"]
@@ -95,7 +95,7 @@ function _plot_stoi_err_vs_beta(SDATA, fpreffix)
         sepouts = sort(collect(D["epouts"]); by = first)
 
         fbaout = D["fbaout"]
-        ex_glc = ChU.av(model, fbaout, iJR.GLC_EX_IDER)
+        ex_glc = ChU.av(model, fbaout, iJR.EX_GLC_IDER)
 
         p = plot(title = string(iJR.PROJ_IDER, " exp_", exp), 
             xlabel = "beta", ylabel = "log10( |stoi_err| / |ex_glc| )")
@@ -123,7 +123,7 @@ end
 ## -------------------------------------------------------------------
 # biomass correlation
 function _plot_full_biomass_correlation(SDATA, fpreffix)
-    obj_ider = iJR.KAYSER_BIOMASS_IDER
+    obj_ider = iJR.BIOMASS_IDER
 
     fba_plot = plot(;xlabel = "exp biomass", ylabel = "model biomass", 
         title = string(iJR.PROJ_IDER, " FBA"))
@@ -175,7 +175,7 @@ function _plot_full_exchs_correlation(SDATA, fpreffix)
     Kd_msd_mets = ["GLC", "CO2", "O2", "AC", "NH4"]
     met_map = iJR.load_mets_map()
     exch_map = iJR.load_exch_met_map()
-    obj_ider = iJR.KAYSER_BIOMASS_IDER
+    obj_ider = iJR.BIOMASS_IDER
 
     fba_exch_plot = plot(;xlabel = "exp exch / |ex_GLC|", ylabel = "model exch / |ex_GLC|", 
         title = string(iJR.PROJ_IDER, " FBA"))
@@ -234,7 +234,7 @@ function _plot_full_conc_correlation(SDATA, fpreffix)
     Kd_msd_mets = ["GLC", "AC", "NH4"]
     met_map = iJR.load_mets_map()
     exch_map = iJR.load_exch_met_map()
-    obj_ider = iJR.KAYSER_BIOMASS_IDER
+    obj_ider = iJR.BIOMASS_IDER
 
     fba_conc_plot = plot(;xlabel = "exp conc / cGLC", ylabel = "model conc / cGLC", 
         title = string(iJR.PROJ_IDER, " FBA"))

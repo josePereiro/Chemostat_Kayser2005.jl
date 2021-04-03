@@ -1,6 +1,6 @@
 let
     method = ME_Z_OPEN_G_OPEN
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
 
     iterator = Kd.val(:D) |> enumerate |> collect 
     @threads for (exp, D) in iterator
@@ -24,7 +24,7 @@ let
         objidx = ChU.rxnindex(model, objider)
 
         exp_growth = Kd.val("D", exp)
-        biom_lb, biom_ub = ChU.bounds(model, iJR.KAYSER_BIOMASS_IDER)
+        biom_lb, biom_ub = ChU.bounds(model, iJR.BIOMASS_IDER)
         if biom_ub < exp_growth
             lock(WLOCK) do
                 INDEX[method, :DFILE, exp] = :unfeasible

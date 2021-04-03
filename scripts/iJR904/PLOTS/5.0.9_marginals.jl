@@ -4,7 +4,7 @@ let
 
     method2 = ME_MAX_POL
 
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
     size = [300, 250]
 
     # Iders
@@ -98,7 +98,7 @@ end
 ## -------------------------------------------------------------------
 # marginals v2
 let 
-    objider = iJR.KAYSER_BIOMASS_IDER
+    objider = iJR.BIOMASS_IDER
     size = [300, 250]
 
     # Iders

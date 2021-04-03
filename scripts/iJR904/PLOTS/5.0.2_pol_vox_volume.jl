@@ -5,11 +5,11 @@ let
     model0 = iJR.load_model("max_model")
 
     bins = 50
-    Kd_rxns_map = iJR.load_Kd_rxns_map()
+    Kd_rxns_map = iJR.load_rxns_map()
     offsetf = 1.1
     
-    exglcidx = ChU.rxnindex(model0, iJR.GLC_EX_IDER)
-    biomidx = ChU.rxnindex(model0, iJR.KAYSER_BIOMASS_IDER)
+    exglcidx = ChU.rxnindex(model0, iJR.EX_GLC_IDER)
+    biomidx = ChU.rxnindex(model0, iJR.BIOMASS_IDER)
     exglcL, exglcU = ChU.bounds(model0, exglcidx)
     
     maxD = maximum(Kd.val(:D)) * offsetf 

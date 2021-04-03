@@ -3,7 +3,7 @@
 # proj 2D
 let
     method = ME_MAX_POL
-    biom_ider = iJR.KAYSER_BIOMASS_IDER
+    biom_ider = iJR.BIOMASS_IDER
 
     ps_pool = Dict()
     for exp in EXPS

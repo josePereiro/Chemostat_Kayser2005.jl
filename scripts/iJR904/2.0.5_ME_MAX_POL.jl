@@ -28,8 +28,8 @@ let
             # SetUp
             model =  iJR.load_model("max_model")
             M, N = size(model)
-            biomidx = ChU.rxnindex(model, iJR.KAYSER_BIOMASS_IDER)
-            glcidx = ChU.rxnindex(model, iJR.GLC_EX_IDER)
+            biomidx = ChU.rxnindex(model, iJR.BIOMASS_IDER)
+            glcidx = ChU.rxnindex(model, iJR.EX_GLC_IDER)
             exp_growth = Kd.val("D", exp) # experimental biom growth rate (equals D)
             # glc per biomass unit supply
             cgD_X = -Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
@@ -129,8 +129,8 @@ let
                     solution = epout
                 )
 
-                biom_avPME = ChU.av(model, epout, iJR.BIOMASS_IDER)
-                vg_avPME = ChU.av(model, epout, iJR.GLC_EX_IDER)
+                biom_avPME = ChU.av(model, epout, iJR.ORIG_BIOMASS_IDER)
+                vg_avPME = ChU.av(model, epout, iJR.EX_GLC_IDER)
                 biom_diff = abs(biom_avPME - exp_growth)
                 vg_diff = abs(vg_avPME - cgD_X)
 
