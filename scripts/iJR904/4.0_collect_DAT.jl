@@ -1,5 +1,6 @@
-import DrWatson: quickactivate
-quickactivate(@__DIR__, "Chemostat_Kayser2005")
+import DrWatson
+const DW = DrWatson
+DW.quickactivate(@__DIR__, "Chemostat_Kayser2005")
 
 @time begin
     import SparseArrays
@@ -36,14 +37,15 @@ end
 ## ----------------------------------------------------------------------------------
 DAT = ChU.DictTree();
 
-## ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 FLX_IDERS = ["GLC", "CO2", "O2", "AC", "NH4"]
 DAT[:FLX_IDERS] = FLX_IDERS
 
-## -------------------------------------------------------------------
+# -------------------------------------------------------------------
 # ME methods
 const ME_Z_OPEN_G_OPEN        = :ME_Z_OPEN_G_OPEN
 const ME_MAX_POL              = :ME_MAX_POL
+const ME_MAX_POL_B0           = :ME_MAX_POL_B0
 const ME_Z_EXPECTED_G_MOVING  = :ME_Z_EXPECTED_G_MOVING
 const ME_Z_EXPECTED_G_BOUNDED = :ME_Z_EXPECTED_G_BOUNDED
 const ME_Z_FIXXED_G_BOUNDED   = :ME_Z_FIXXED_G_BOUNDED
@@ -63,6 +65,7 @@ DAT[:LP_METHODS] = LP_METHODS
 ME_METHODS = [
     # ME_Z_OPEN_G_OPEN, 
     ME_MAX_POL,
+    ME_MAX_POL_B0,
     # ME_Z_FIXXED_G_BOUNDED, 
     # ME_Z_EXPECTED_G_BOUNDED, 
     # ME_Z_EXPECTED_G_MOVING
@@ -75,17 +78,20 @@ DAT[:ALL_METHODS] = ALL_METHODS
 EXPS = 5:13
 DAT[:EXPS] = EXPS
 
-## -------------------------------------------------------------------
+# -------------------------------------------------------------------
 ME_INDEX_FILE = iJR.procdir("maxent_ep_index.bson")
 ME_INDEX = ChU.load_data(ME_INDEX_FILE; verbose = false);
 
-## -------------------------------------------------------------------
+# -------------------------------------------------------------------
 LP_DAT_FILE = iJR.procdir("lp_dat_file.bson")
 LP_DAT = ChU.load_data(LP_DAT_FILE; verbose = false);
 
-## ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 Kd_mets_map = iJR.load_mets_map()
 Kd_rxns_map = iJR.load_rxns_map()
+
+# ----------------------------------------------------------------------------------
+const DAT_FILE_PREFFIX =  "maxent_ep_dat"
 
 ## ----------------------------------------------------------------------------------
 # COMMON DAT
@@ -132,22 +138,35 @@ let
     WLOCK = ReentrantLock()
     objider = iJR.BIOMASS_IDER
 
+    # util fun
+    isexpdep(method) = (method != ME_MAX_POL_B0)
+    depks(method, typ, Kd_met, exp) = 
+        isexpdep(method) ? (method, typ, Kd_met, exp) : (method, typ, Kd_met)
+    function dat_file(;method, exp)
+        kwargs = isexpdep(method) ? (;method, exp) : (;method)
+        fname = UJL.mysavename(DAT_FILE_PREFFIX, "jls"; kwargs...)
+        iJR.procdir(fname)
+    end
+
     # Feed jobs
     nths = nthreads()
     Ch = Channel(nths) do ch
-        for exp in DAT[:EXPS], method in DAT[:ME_METHODS]
-            put!(ch, (exp, method))
+        for method in DAT[:ME_METHODS]
+            for exp in DAT[:EXPS]
+                put!(ch, (exp, method))
+                !isexpdep(method) && break # Do only once
+            end
         end
     end
 
     @threads for thid in 1:nths
         thid = threadid()
-        thid == 1 && nths > 1 && continue
+        # thid == 1 && nths > 1 && continue
         for (exp, method) in Ch
-            
+
             # ME data
-            datfile = ME_INDEX[method, :DFILE, exp]
-            datfile == :unfeasible && continue
+            datfile = dat_file(;method, exp)
+            !isfile(datfile) && continue
             dat = deserialize(datfile)
             
             model = dat[:model]
@@ -169,8 +188,8 @@ let
             
             # store
             lock(WLOCK) do
-                DAT[method, :flx, "D", exp] = ep_biom
-                DAT[method, :err, "D", exp] = ep_std
+                DAT[depks(method, :flx, "D", exp)...] = ep_biom
+                DAT[depks(method, :err, "D", exp)...] = ep_std
             end
 
             for Kd_met in FLX_IDERS
@@ -184,9 +203,9 @@ let
                 proj = ChLP.projection2D(model, objider, model_exch; l = 50)
                         
                 lock(WLOCK) do
-                    DAT[method, :proj, Kd_met, exp] = proj
-                    DAT[method, :flx, Kd_met, exp] = ep_av
-                    DAT[method, :err, Kd_met, exp] = ep_std
+                    DAT[depks(method, :proj, Kd_met, exp)...] = proj
+                    DAT[depks(method, :flx, Kd_met, exp)...] = ep_av
+                    DAT[depks(method, :err, Kd_met, exp)...] = ep_std
                 end
             end
 
@@ -200,7 +219,6 @@ let
     objider = iJR.BIOMASS_IDER
 
     for method in LP_METHODS
-            
         for exp in EXPS
 
             model = LP_DAT[method, :model, exp]

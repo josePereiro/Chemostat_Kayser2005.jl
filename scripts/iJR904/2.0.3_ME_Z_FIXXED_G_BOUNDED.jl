@@ -13,7 +13,7 @@ let
         datfile = dat_file(DAT_FILE_PREFFIX; exp, method)
         if isfile(datfile)
             lock(WLOCK) do
-                INDEX[method, :DFILE, exp] = datfile
+                
                 @info("Cached loaded (skipping)",
                     exp, D, datfile, threadid()
                 ); println()
@@ -71,7 +71,7 @@ let
 
             # caching
             serialize(datfile, dat)
-            INDEX[method, :DFILE, exp] = datfile
+            
 
             @info("Finished ", exp, threadid())
             println()

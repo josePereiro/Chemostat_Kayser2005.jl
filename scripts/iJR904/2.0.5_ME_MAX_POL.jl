@@ -2,7 +2,8 @@ let
     method = ME_MAX_POL
     ## -------------------------------------------------------------------
     # Monitor
-    mon = UJL.OnDiskMonitor(iJR.MODEL_CACHE_DIR, "monitor.jld2")
+    monfile = iJR.cachedir("monitor.jld2")
+    mon = UJL.OnDiskMonitor(monfile)
     UJL.reset!(mon)
 
     # Feed jobs
@@ -21,8 +22,8 @@ let
 
             ## -------------------------------------------------------------------
             # handle cache
-            datfile = dat_file(DAT_FILE_PREFFIX; method, exp)
-            check_cache(datfile, exp, method) && continue
+            datfile = dat_file(;method, exp)
+            check_cache(;method, exp) && continue
 
             ## -------------------------------------------------------------------
             # SetUp
@@ -322,8 +323,7 @@ let
 
                 # caching
                 serialize(datfile, dat)
-                INDEX[method, :DFILE, exp] = datfile
-
+                
                 print_info("Finished "; exp, rounditer)
             end
 
