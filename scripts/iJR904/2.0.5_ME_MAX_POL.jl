@@ -331,3 +331,89 @@ let
     end # for thid
     UJL.reset!(mon)
 end
+
+# TODO implement further convergence
+# ## -------------------------------------------------------------------
+# # further convergence
+# let
+#     method = ME_MAX_POL
+    
+#     cGLCs = Kd.val("cGLC")
+#     for (exp, cGLC)  in enumerate(cGLCs)
+        
+#         datfile = dat_file(;method, exp)
+#         !isfile(datfile) && continue
+
+#         dat = deserialize(datfile)
+#         converg_status = get(dat, :converg_status, false)
+
+#         model = dat[:model] |> ChU.uncompressed_model
+#         M, N = size(model)
+#         epouts = dat[:epouts]
+#         biom_beta0, vg_beta0 = dat[:exp_beta]
+#         # biom_beta, vg_beta = maximum(keys(epouts))
+#         # epout = epouts[(biom_beta, vg_beta)]
+
+#         biomidx = ChU.rxnindex(model, iJR.BIOMASS_IDER)
+#         glcidx = ChU.rxnindex(model, iJR.EX_GLC_IDER)
+
+#         @info("Converging Doing", method, exp, 
+#             biom_beta, vg_beta, 
+#             converg_status
+#         ); println()
+        
+#         converg_status && continue
+
+#         # MAXENT
+#         function oniter(it, epmodel) 
+#             max_err = epmodel.stat[:max_err]
+#             if isnan(max_err) 
+#                 @warn("Nan detected!!!", it); println()
+#                 return (true, :FATAL_ERROR)
+#             end
+#             (false, nothing)
+#         end
+#         beta_vec = zeros(N)
+
+#         epout = nothing
+
+#         biom_betas = range(0.0, biom_beta0; length = 50)
+#         for biom_beta in biom_betas
+
+#             beta_vec[biomidx] = biom_beta
+#             beta_vec[glcidx] = vg_beta0
+
+#             damp = 0.9
+#             maxiter = 5000
+#             epsconv = 1e-4
+#             # minvar = 1e-20
+#             # maxvar = 1e20
+#             epout = ChEP.maxent_ep(model; 
+#                 oniter, beta_vec, alpha = Inf,
+#                 maxiter,  epsconv, damp,
+#                 # minvar, maxvar,
+#                 verbose = true, 
+#                 solution = epout
+#             ); println()
+            
+#             epout == :FATAL_ERROR && break
+#         end
+#         epout == :FATAL_ERROR && continue
+
+#         converg_status =  epout.status != ChEP.CONVERGED_STATUS 
+#         if !converg_status
+#             @warn("Not converged", 
+#                 method, exp, 
+#                 biom_beta, vg_beta, 
+#                 epout.status,
+#                 converg_status
+#             ); println()
+#         end
+
+#         dat[:epouts] = epouts
+#         dat[:converg_status] = converg_status
+#         # serialize(datfile, dat)
+
+#         break
+#     end 
+# end

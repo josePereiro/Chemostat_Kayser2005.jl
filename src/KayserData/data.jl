@@ -71,6 +71,10 @@ function _load_and_bundle()
     dict["unit"] = "gDW/ L hr"
     dict["vals"] = BUNDLE["Xv"]["vals"] ./ BUNDLE["D"]["vals"];
 
+    ## ------------------------------------------------------------------
+    # X (common name)
+    BUNDLE["X"] = BUNDLE["Xv"]
+
     # exchage for exp 14 and 15 wans't directly reported
     # I compute it using 0 = uX + (c - s)D
     for met in ["AC", "GLC", "NH4"]

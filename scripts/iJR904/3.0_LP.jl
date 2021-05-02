@@ -31,18 +31,12 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
 end
 
 ## -----------------------------------------------------------------------------------------------
-const FBA_Z_FIX_MIN_COST    = :FBA_Z_FIX_MIN_COST
-const FBA_MAX_BIOM_MIN_COST = :FBA_MAX_BIOM_MIN_COST
-const FBA_Z_FIX_MIN_VG_COST = :FBA_Z_FIX_MIN_VG_COST
-const FBA_Z_VG_FIX_MIN_COST = :FBA_Z_VG_FIX_MIN_COST
+const FBA_Z_FIX_MIN_COST        = :FBA_Z_FIX_MIN_COST
+const FBA_Z_FIX_MAX_VG_MIN_COST = :FBA_Z_FIX_MAX_VG_MIN_COST
+const FBA_MAX_Z_MIN_COST        = :FBA_MAX_Z_MIN_COST
+const FBA_Z_FIX_MIN_VG_COST     = :FBA_Z_FIX_MIN_VG_COST
+const FBA_Z_VG_FIX_MIN_COST     = :FBA_Z_VG_FIX_MIN_COST
 const EXPS = 5:13
-
-## -----------------------------------------------------------------------------------------------
-function load_model(exp)
-    BASE_MODELS = ChU.load_data(iJR.BASE_MODELS_FILE; verbose = false);
-    model_dict = BASE_MODELS["fva_models"][exp]
-    model = ChU.MetNet(;model_dict...) |> ChU.uncompressed_model
-end
 
 ## -----------------------------------------------------------------------------------------------
 # Data container
@@ -62,18 +56,29 @@ let
 
         @info("Doing ", exp); println()
 
-        # FBA_MAX_BIOM_MIN_COST
+        # FBA_Z_FIX_MAX_VG_MIN_COST
         let
-            model = load_model(exp)
+            model = iJR.load_model("fva_models", exp)
+            exp_growth = Kd.val("D", exp)
+            ChU.bounds!(model, objider, exp_growth, exp_growth)
+            fbaout = ChLP.fba(model, exglcider, costider)
+
+            LPDAT[FBA_Z_FIX_MAX_VG_MIN_COST, :model, exp] = model
+            LPDAT[FBA_Z_FIX_MAX_VG_MIN_COST, :fbaout, exp] = fbaout
+        end
+
+        # FBA_MAX_Z_MIN_COST
+        let
+            model = iJR.load_model("fva_models", exp)
             fbaout = ChLP.fba(model, objider, costider)
             
-            LPDAT[FBA_MAX_BIOM_MIN_COST, :model, exp] = model
-            LPDAT[FBA_MAX_BIOM_MIN_COST, :fbaout, exp] = fbaout
+            LPDAT[FBA_MAX_Z_MIN_COST, :model, exp] = model
+            LPDAT[FBA_MAX_Z_MIN_COST, :fbaout, exp] = fbaout
         end
 
         # FBA_Z_FIX_MIN_COST
         let
-            model = load_model(exp)
+            model = iJR.load_model("fva_models", exp)
             exp_growth = Kd.val("D", exp)
             ChU.bounds!(model, objider, exp_growth, exp_growth)
             fbaout = ChLP.fba(model, objider, costider)
@@ -84,7 +89,7 @@ let
 
         # FBA_Z_FIX_MIN_VG_COST
         let
-            model = load_model(exp)
+            model = iJR.load_model("fva_models", exp)
             exp_growth = Kd.val("D", exp)
             ChU.bounds!(model, objider, exp_growth, exp_growth)
             fbaout1 = ChLP.fba(model, exglcider; sense = max_sense)
@@ -98,7 +103,7 @@ let
 
         # FBA_Z_VG_FIX_MIN_COST
         let
-            model = load_model(exp)
+            model = iJR.load_model("fva_models", exp)
             exp_growth = Kd.val("D", exp)
             ChU.bounds!(model, objider, exp_growth, exp_growth)
             exp_exglc = Kd.uval("GLC", exp)
@@ -112,4 +117,45 @@ let
 end
 
 ## -------------------------------------------------------------------
-ChU.save_data(iJR.LP_DAT_FILE, LPDAT)
+LP_DAT_FILE = iJR.procdir("lp_dat_file.bson")
+ChU.save_data(LP_DAT_FILE, LPDAT)
+
+## -------------------------------------------------------------------
+using Plots
+let
+    METHODS = [
+        FBA_Z_FIX_MIN_COST, FBA_Z_FIX_MAX_VG_MIN_COST, 
+        FBA_MAX_Z_MIN_COST, FBA_Z_FIX_MIN_VG_COST, 
+        FBA_Z_VG_FIX_MIN_COST
+    ]
+    FLX_IDERS = ["GLC", "CO2", "O2", "AC", "NH4"]
+    rxn_map = iJR.load_rxns_map()
+    color_pool = Plots.distinguishable_colors(length(FLX_IDERS))
+    ider_color = Dict(ider => color for (ider, color) in zip(FLX_IDERS, color_pool))
+
+    ps = Plots.Plot[]
+    for method in METHODS
+        p = plot(;title = string(method), xlabel = "exp", ylabel = "model")
+
+        for exp in EXPS
+            model = LPDAT[method, :model, exp]
+            fbaout = LPDAT[method, :fbaout, exp]
+
+            for Kd_ider in FLX_IDERS
+                iJR_ider = rxn_map[Kd_ider]
+                
+                exp_val = Kd.uval(Kd_ider, exp) |> abs
+                model_val = ChU.av(model, fbaout, iJR_ider) |> abs
+
+                scatter!(p, [exp_val], [model_val]; label = "",
+                    color = ider_color[Kd_ider], m = 8
+                )
+            end
+        end
+            push!(ps, p)
+    end
+    
+    figname = string("fba_corrs")
+    dir = iJR.plotsdir()
+    UJL.mysavefig(ps, figname, dir)
+end

@@ -52,12 +52,12 @@ const ME_Z_FIXXED_G_BOUNDED   = :ME_Z_FIXXED_G_BOUNDED
 
 # LP methods
 const FBA_Z_FIX_MIN_COST      = :FBA_Z_FIX_MIN_COST
-const FBA_MAX_BIOM_MIN_COST   = :FBA_MAX_BIOM_MIN_COST
+const FBA_MAX_Z_MIN_COST   = :FBA_MAX_Z_MIN_COST
 const FBA_Z_FIX_MIN_VG_COST   = :FBA_Z_FIX_MIN_VG_COST
 const FBA_Z_VG_FIX_MIN_COST   = :FBA_Z_VG_FIX_MIN_COST
 
 LP_METHODS = [
-    FBA_Z_FIX_MIN_COST, FBA_MAX_BIOM_MIN_COST, 
+    FBA_Z_FIX_MIN_COST, FBA_MAX_Z_MIN_COST, 
     FBA_Z_FIX_MIN_VG_COST, FBA_Z_VG_FIX_MIN_COST
 ]
 DAT[:LP_METHODS] = LP_METHODS
@@ -67,7 +67,7 @@ ME_METHODS = [
     ME_MAX_POL,
     ME_MAX_POL_B0,
     # ME_Z_FIXXED_G_BOUNDED, 
-    # ME_Z_EXPECTED_G_BOUNDED, 
+    ME_Z_EXPECTED_G_BOUNDED, 
     # ME_Z_EXPECTED_G_MOVING
 ]
 DAT[:ME_METHODS] = ME_METHODS
@@ -161,7 +161,7 @@ let
 
     @threads for thid in 1:nths
         thid = threadid()
-        # thid == 1 && nths > 1 && continue
+        thid == 1 && nths > 1 && continue
         for (exp, method) in Ch
 
             # ME data
@@ -192,6 +192,7 @@ let
                 DAT[depks(method, :err, "D", exp)...] = ep_std
             end
 
+            # exchanges
             for Kd_met in FLX_IDERS
                 model_exch = Kd_rxns_map[Kd_met]
 
@@ -206,6 +207,27 @@ let
                     DAT[depks(method, :proj, Kd_met, exp)...] = proj
                     DAT[depks(method, :flx, Kd_met, exp)...] = ep_av
                     DAT[depks(method, :err, Kd_met, exp)...] = ep_std
+                end
+            end
+
+            # additional fluxs
+            for (ider, model_iders) in iJR.kreps_idermap
+                # flxs
+                ep_av = ChU.av(model, epout, model_iders[1])
+                ep_std = sqrt(ChU.va(model, epout, model_iders[1]))
+                if length(model_iders) == 2 # reversible
+                    # r = r+ - r-
+                    ep_av -= ChU.av(model, epout, model_iders[2])
+                    ep_std += sqrt(ChU.va(model, epout, model_iders[2]))
+                end
+
+                # proj 2d (fwd only)
+                proj = ChLP.projection2D(model, objider, model_iders[1]; l = 50)
+                        
+                lock(WLOCK) do
+                    DAT[depks(method, :proj, ider, exp)...] = proj
+                    DAT[depks(method, :flx, ider, exp)...] = ep_av
+                    DAT[depks(method, :err, ider, exp)...] = ep_std
                 end
             end
 
@@ -236,6 +258,19 @@ let
                 fba_flx = ChU.av(model, fbaout, model_ider)
                 DAT[method, :flx, Kd_ider, exp] = fba_flx
             end
+
+            # additional fluxs
+            for (ider, model_iders) in iJR.kreps_idermap
+                # flxs
+                fba_flx = ChU.av(model, fbaout, model_iders[1])
+                if length(model_iders) == 2 # reversible
+                    # r = r+ - r-
+                    fba_flx -= ChU.av(model, fbaout, model_iders[2])
+                end
+                        
+                DAT[method, :flx, ider, exp] = fba_flx
+            end
+            
         end
 
     end # for method

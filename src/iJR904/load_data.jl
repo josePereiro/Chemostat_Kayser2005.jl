@@ -210,3 +210,23 @@ function intake_info(exp)
     )
 end
 
+function load_krebs_iders()
+    krebs_iders = ["SUCD1", "SUCOAS", "AKGDH", "ICDHyr", 
+        "ACONT", "CS", "MDH", "FUM", "MALS", "ICL"
+    ]
+end
+
+function load_kreps_idermap()
+    kreps_idermap = Dict(
+        "SUCD1" => ["SUCD1i"], 
+        "SUCOAS" => ["SUCOAS_fwd", "SUCOAS_bkwd"], 
+        "AKGDH" => ["AKGDH"],
+        "ICDHyr" => ["ICDHyr_fwd", "ICDHyr_bkwd"],
+        "ACONT" => ["ACONT_bkwd", "ACONT_fwd"],
+        "CS" => ["CS"],
+        "MDH" => ["MDH_fwd", "MDH_bkwd"],
+        "FUM" => ["FUM_fwd", "FUM_bkwd"],
+        "MALS" => ["MALS"],
+        "ICL" => ["ICL"]
+    )
+end

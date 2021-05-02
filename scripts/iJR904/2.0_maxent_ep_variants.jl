@@ -30,12 +30,11 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     UJL.set_cache_dir(iJR.cachedir())
 end
 
-## ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # globals
 const WLOCK = ReentrantLock()
 const DAT_FILE_PREFFIX =  "maxent_ep_dat"
 
-## ----------------------------------------------------------------------------
 const ME_Z_OPEN_G_OPEN          = :ME_Z_OPEN_G_OPEN           # Do not use extra constraints
 const ME_MAX_POL                = :ME_MAX_POL                 # 
 const ME_MAX_POL_B0             = :ME_MAX_POL_B0                 # 
@@ -44,7 +43,7 @@ const ME_Z_EXPECTED_G_BOUNDED   = :ME_Z_EXPECTED_G_BOUNDED    # Match ME and Dy 
 const ME_Z_EXPECTED_G_MOVING    = :ME_Z_EXPECTED_G_MOVING     # 
 const ME_Z_FIXXED_G_BOUNDED     = :ME_Z_FIXXED_G_BOUNDED      # Fix biom around observed
 
-## -------------------------------------------------------------------
+# -------------------------------------------------------------------
 function dat_file(;kwargs...)
     fname = UJL.mysavename(DAT_FILE_PREFFIX, "jls"; kwargs...)
     iJR.procdir(fname)
