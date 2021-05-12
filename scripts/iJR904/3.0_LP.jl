@@ -75,7 +75,7 @@ let
             # min cost
             fbaout = ChLP.fba(model, costider; sense = min_sense)
 
-            LPDAT[FBA_Z_FIX_MAX_VG_MIN_COST, :model, exp] = model
+            LPDAT[FBA_Z_FIX_MAX_VG_MIN_COST, :model, exp] = ChU.compressed_model(model)
             LPDAT[FBA_Z_FIX_MAX_VG_MIN_COST, :fbaout, exp] = fbaout
         end
 
@@ -95,7 +95,7 @@ let
             # max cost
             fbaout = ChLP.fba(model, costider; sense = max_sense)
 
-            LPDAT[FBA_Z_FIX_MAX_VG_MAX_COST, :model, exp] = model
+            LPDAT[FBA_Z_FIX_MAX_VG_MAX_COST, :model, exp] = ChU.compressed_model(model)
             LPDAT[FBA_Z_FIX_MAX_VG_MAX_COST, :fbaout, exp] = fbaout
         end
 
@@ -111,7 +111,7 @@ let
             # min cost
             fbaout = ChLP.fba(model, costider; sense = min_sense)
      
-            LPDAT[FBA_MAX_Z_MIN_COST, :model, exp] = model
+            LPDAT[FBA_MAX_Z_MIN_COST, :model, exp] = ChU.compressed_model(model)
             LPDAT[FBA_MAX_Z_MIN_COST, :fbaout, exp] = fbaout
         end
 
@@ -127,7 +127,7 @@ let
             # max cost
             fbaout = ChLP.fba(model, costider; sense = max_sense)
      
-            LPDAT[:FBA_MAX_Z_MAX_COST, :model, exp] = model
+            LPDAT[:FBA_MAX_Z_MAX_COST, :model, exp] = ChU.compressed_model(model)
             LPDAT[:FBA_MAX_Z_MAX_COST, :fbaout, exp] = fbaout
         end
 
@@ -143,7 +143,7 @@ let
             # min cost
             fbaout = ChLP.fba(model, costider; sense = min_sense)
 
-            LPDAT[FBA_Z_FIX_MIN_COST, :model, exp] = model
+            LPDAT[FBA_Z_FIX_MIN_COST, :model, exp] = ChU.compressed_model(model)
             LPDAT[FBA_Z_FIX_MIN_COST, :fbaout, exp] = fbaout
         end
 
@@ -159,7 +159,7 @@ let
             # max cost
             fbaout = ChLP.fba(model, costider; sense = max_sense)
 
-            LPDAT[FBA_Z_FIX_MAX_COST, :model, exp] = model
+            LPDAT[FBA_Z_FIX_MAX_COST, :model, exp] = ChU.compressed_model(model)
             LPDAT[FBA_Z_FIX_MAX_COST, :fbaout, exp] = fbaout
         end
 
@@ -178,7 +178,7 @@ let
             # min cost
             fbaout = ChLP.fba(model, costider; sense = min_sense)
 
-            LPDAT[FBA_Z_VG_FIX_MIN_COST, :model, exp] = model
+            LPDAT[FBA_Z_VG_FIX_MIN_COST, :model, exp] = ChU.compressed_model(model)
             LPDAT[FBA_Z_VG_FIX_MIN_COST, :fbaout, exp] = fbaout
         end
 
@@ -197,7 +197,7 @@ let
             # max cost
             fbaout = ChLP.fba(model, costider; sense = max_sense)
 
-            LPDAT[FBA_Z_VG_FIX_MAX_COST, :model, exp] = model
+            LPDAT[FBA_Z_VG_FIX_MAX_COST, :model, exp] = ChU.compressed_model(model)
             LPDAT[FBA_Z_VG_FIX_MAX_COST, :fbaout, exp] = fbaout
         end
 
