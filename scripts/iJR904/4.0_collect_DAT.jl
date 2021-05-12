@@ -51,14 +51,19 @@ const ME_Z_EXPECTED_G_BOUNDED = :ME_Z_EXPECTED_G_BOUNDED
 const ME_Z_FIXXED_G_BOUNDED   = :ME_Z_FIXXED_G_BOUNDED
 
 # LP methods
-const FBA_Z_FIX_MIN_COST      = :FBA_Z_FIX_MIN_COST
-const FBA_MAX_Z_MIN_COST   = :FBA_MAX_Z_MIN_COST
-const FBA_Z_FIX_MIN_VG_COST   = :FBA_Z_FIX_MIN_VG_COST
-const FBA_Z_VG_FIX_MIN_COST   = :FBA_Z_VG_FIX_MIN_COST
+const FBA_Z_FIX_MAX_VG_MIN_COST = :FBA_Z_FIX_MAX_VG_MIN_COST
+const FBA_Z_FIX_MAX_VG_MAX_COST = :FBA_Z_FIX_MAX_VG_MAX_COST
+const FBA_Z_VG_FIX_MAX_COST = :FBA_Z_VG_FIX_MAX_COST
+const FBA_Z_VG_FIX_MIN_COST = :FBA_Z_VG_FIX_MIN_COST
+const FBA_Z_FIX_MAX_COST = :FBA_Z_FIX_MAX_COST
+const FBA_Z_FIX_MIN_COST = :FBA_Z_FIX_MIN_COST
+const FBA_MAX_Z_MIN_COST = :FBA_MAX_Z_MIN_COST
+const FBA_MAX_Z_MAX_COST = :FBA_MAX_Z_MAX_COST
 
 LP_METHODS = [
-    FBA_Z_FIX_MIN_COST, FBA_MAX_Z_MIN_COST, 
-    FBA_Z_FIX_MIN_VG_COST, FBA_Z_VG_FIX_MIN_COST
+    FBA_Z_FIX_MAX_VG_MIN_COST, FBA_Z_FIX_MAX_VG_MAX_COST, 
+    FBA_Z_VG_FIX_MAX_COST, FBA_Z_VG_FIX_MIN_COST, FBA_Z_FIX_MAX_COST, 
+    FBA_Z_FIX_MIN_COST, FBA_MAX_Z_MIN_COST, FBA_MAX_Z_MAX_COST
 ]
 DAT[:LP_METHODS] = LP_METHODS
 
@@ -211,7 +216,7 @@ let
             end
 
             # additional fluxs
-            for (ider, model_iders) in iJR.kreps_idermap
+            for (ider, model_iders) in iJR.load_kreps_idermap()
                 # flxs
                 ep_av = ChU.av(model, epout, model_iders[1])
                 ep_std = sqrt(ChU.va(model, epout, model_iders[1]))
@@ -260,7 +265,7 @@ let
             end
 
             # additional fluxs
-            for (ider, model_iders) in iJR.kreps_idermap
+            for (ider, model_iders) in iJR.load_kreps_idermap()
                 # flxs
                 fba_flx = ChU.av(model, fbaout, model_iders[1])
                 if length(model_iders) == 2 # reversible
