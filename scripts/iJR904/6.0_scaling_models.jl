@@ -24,8 +24,6 @@ const ChEP = Ch.MaxEntEP
 const ChSU = Ch.SimulationUtils
 
 ## -------------------------------------------------------------------
-
-## -------------------------------------------------------------------
 let
     # setup
     cache_dir = iJR.MODEL_CACHE_DIR
