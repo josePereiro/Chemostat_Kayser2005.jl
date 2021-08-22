@@ -1,5 +1,5 @@
-import DrWatson: quickactivate
-quickactivate(@__DIR__, "Chemostat_Kayser2005")
+using ProjAssistant
+@quickactivate 
 
 # ------------------------------------------------------------------
 @time begin
@@ -158,13 +158,13 @@ atpm = 2.81;
 ## ------------------------------------------------------------------
 # SAVING
 # Table1
-CONV_TABLE1_FILE = Kd.procdir("table1_conv.bson")
-ChU.save_data(CONV_TABLE1_FILE, table1_converted)
+CONV_TABLE1_FILE = procdir(Kd, "table1_conv.bson")
+sdat(table1_converted, CONV_TABLE1_FILE)
 
 # Table2
-CONV_TABLE2_FILE = Kd.procdir("table2_conv.bson")
-ChU.save_data(CONV_TABLE2_FILE, table2_converted)
+CONV_TABLE2_FILE = procdir(Kd, "table2_conv.bson")
+sdat(table2_converted, CONV_TABLE2_FILE)
 
 # Medium
-CONV_MEDIUM_FILE = Kd.procdir("medium_conv.bson")
-ChU.save_data(CONV_MEDIUM_FILE, medium_converted)
+CONV_MEDIUM_FILE = procdir(Kd, "medium_conv.bson")
+sdat(medium_converted, CONV_MEDIUM_FILE)

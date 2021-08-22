@@ -1,23 +1,15 @@
-import DrWatson: quickactivate
-quickactivate(@__DIR__, "Chemostat_Kayser2005")
+using ProjAssistant
+@quickactivate 
 
 @time begin
     
     import Chemostat_Kayser2005
     const ChK = Chemostat_Kayser2005
-    const Kd = ChK.KayserData    
-
-    using UtilsJL
-    const UJL = UtilsJL
+    const Kd = ChK.KayserData
 
     using Plots
-end
-
-## -------------------------------------------------------------------
-fileid = "1.1"
-function mysavefig(p, pname; params...) 
-    fname = UJL.mysavefig(p, string(fileid, "_", pname), Kd.KAYSER_FIGURES_DIR; params...)
-    @info "Plotting" fname
+    import GR
+    !isinteractive() && GR.inline("png")
 end
 
 ## -------------------------------------------------------------------
@@ -45,7 +37,9 @@ let
         )
         push!(ps, p)
     end
-    mysavefig(ps, "Balances") 
+    sfig(Kd, ps, 
+        @fileid, "Balances", ".png"
+    ) 
 end
 
 ## -------------------------------------------------------------------
@@ -69,7 +63,9 @@ let
             id1 = ids[i]
             id2 = ids[j]
             p = plot_ids(id1, id2)
-            mysavefig(p, "ids_plot"; id1, id2) 
+            sfig(Kd, p, 
+                @fileid, "ids_plot", (;id1, id2), ".png"
+            )
         end
     end
 end 
@@ -108,7 +104,9 @@ let
         )
         push!(ps, p)
     end
-    mysavefig(ps, "tr_vs_u")
+    sfig(Kd, ps, 
+        @fileid, "tr_vs_u", ".png"
+    )
 end
 
 ## -------------------------------------------------------------------
@@ -116,11 +114,12 @@ end
 # I compute it using 0 = uX + (c - s)D
 let
     ps = Plots.Plot[]
+    exps = Kd.EXPS
     for id in [:AC, :GLC, :NH4]
         com_us = []
         rep_us = []
         p = plot(;xlabel = "exp", ylabel = string(id))
-        for exp in Kd.EXPS
+        for exp in exps
             c = Kd.cval(id, exp, 0.0)
             s = Kd.sval(id, exp)
             D = Kd.val(:D, exp)
@@ -139,6 +138,8 @@ let
         push!(ps, p)
     end
 
-    mysavefig(ps, "exchanges_computed")
+    sfig(Kd, ps, 
+        @fileid, "exchanges_computed", ".png"
+    )
 
 end

@@ -1,6 +1,7 @@
-import DrWatson: quickactivate
-quickactivate(@__DIR__, "Chemostat_Kayser2005")
+using ProjAssistant
+@quickactivate 
 
+# ------------------------------------------------------------------
 @time begin
     import SparseArrays
     import Base.Threads: @threads, threadid, SpinLock
@@ -11,8 +12,8 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     const ChK = Chemostat_Kayser2005
 
     const iJR = ChK.iJR904
-    const Kd = ChK.KayserData # experimental data
-    const Bd = ChK.BegData    # cost data
+    const Kd = ChK.KayserData           # experimental data
+    const Bd = ChK.BegData              # cost data
 
     import Chemostat
     import Chemostat.LP: MathProgBase
@@ -23,62 +24,95 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     const ChEP = Ch.MaxEntEP
     const ChSU = Ch.SimulationUtils
 
-    import UtilsJL
-    const UJL = UtilsJL
     using Serialization
     using Base.Threads
-    UJL.set_cache_dir(iJR.cachedir())
+    using ArgParse
+
+    import SimTools
+    const SimT = SimTools
 end
 
-# ----------------------------------------------------------------------------
-# globals
+## ----------------------------------------------------------------------------
+# arg settings
+ARGSET = ArgParse.ArgParseSettings()
+@ArgParse.add_arg_table! ARGSET begin
+    "--ignore-cached"
+        help = "Ingnore on disk version of data"
+        action = :store_true
+end
+ARGS_DICT = ArgParse.parse_args(ARGSET)
+
+if isinteractive()
+    # dev values
+    ignore_cached = true
+else
+    ignore_cached = ARGS_DICT["ignore-cached"]
+end
+@info("ARGS", ignore_cached, nthreads())
+
+## ----------------------------------------------------------------------------
+# FILE GLOBALS
 const WLOCK = ReentrantLock()
-const DAT_FILE_PREFFIX =  "maxent_ep_dat"
+# Excluded because of unfeasibility or convergence issues
+const IGNORE_EXPS = [1,2,3,4,13]
 
-const ME_Z_OPEN_G_OPEN          = :ME_Z_OPEN_G_OPEN           # Do not use extra constraints
-const ME_MAX_POL                = :ME_MAX_POL                 # 
-const ME_MAX_POL_B0             = :ME_MAX_POL_B0                 # 
-const ME_Z_EXPECTED_G_EXPECTED  = :ME_Z_EXPECTED_G_EXPECTED    # Match ME and Dy biom average and constraint av_ug
-const ME_Z_EXPECTED_G_BOUNDED   = :ME_Z_EXPECTED_G_BOUNDED    # Match ME and Dy biom average and constraint av_ug
-const ME_Z_EXPECTED_G_MOVING    = :ME_Z_EXPECTED_G_MOVING     # 
-const ME_Z_FIXXED_G_BOUNDED     = :ME_Z_FIXXED_G_BOUNDED      # Fix biom around observed
+## -------------------------------------------------------------------
+# UTILS
+dat_file(;kwargs...) = procdir(iJR, "maxent_ep_dat", kwargs..., ".jls")
 
-# -------------------------------------------------------------------
-function dat_file(;kwargs...)
-    fname = UJL.mysavename(DAT_FILE_PREFFIX, "jls"; kwargs...)
-    iJR.procdir(fname)
-end
-
-function check_cache(;kwargs...)
+function is_cached(;kwargs...)
+    ignore_cached && return false
     thid = threadid()
     datfile = dat_file(;kwargs...)
     isfile(datfile) && lock(WLOCK) do
-        @info("Cached loaded (skipping)",
+        @info("Cache Found",
             datfile, thid
         ); println()
     end; isfile(datfile)
 end
 
 ## -------------------------------------------------------------------
-# ME_Z_EXPECTED_G_MOVING
-include("2.0.1_ME_Z_EXPECTED_G_MOVING.jl")
+# MAXENT FUNS
+include("2.0.1_ME_MAX_POL.jl")
+include("2.0.2_ME_MAX_POL_B0.jl")
+include("2.0.3_ME_Z_EXPECTED_G_BOUNDED.jl")
 
 ## -------------------------------------------------------------------
-# ME_Z_EXPECTED_G_BOUNDED
-# include("2.0.2_ME_Z_EXPECTED_G_BOUNDED.jl")
-
-## -------------------------------------------------------------------
-# ME_Z_FIXXED_G_BOUNDED
-# include("2.0.3_ME_Z_FIXXED_G_BOUNDED.jl")
-
-## -------------------------------------------------------------------
-# ME_Z_OPEN_G_OPEN
-# include("2.0.4_ME_Z_OPEN_G_OPEN.jl")
+# ME GLOBALS
+sglob(iJR, :maxent, :params) do
+    (;
+        alpha = Inf,
+        epsconv = 9e-4,
+        maxiter = 1000,
+        damp = 0.9,
+        maxvar = 1e50,
+        minvar = 1e-50,
+    )
+end
 
 ## -------------------------------------------------------------------
 # ME_MAX_POL
-include("2.0.5_ME_MAX_POL.jl")
+let
+    method = iJR.ME_MAX_POL
+    model_key = "max_model"
+    
+    maxent_max_pol(method, model_key)
+end
 
 ## ----------------------------------------------------------------------------
 # ME_MAX_POL_B0
-include("2.0.7_ME_MAX_POL_B0.jl")
+let
+    method = iJR.ME_MAX_POL_B0
+    model_key = "max_model"
+    
+    do_max_pol_b0(method, model_key)
+end
+
+## ----------------------------------------------------------------------------
+# ME_Z_EXPECTED_G_BOUNDED
+let
+    method = iJR.ME_Z_EXPECTED_G_BOUNDED
+    model_key = "fva_models"
+    
+    do_z_expected_ug_bounded(method, model_key)
+end

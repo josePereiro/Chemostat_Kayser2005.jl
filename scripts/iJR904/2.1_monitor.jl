@@ -1,34 +1,40 @@
-import DrWatson: quickactivate
-quickactivate(@__DIR__, "Chemostat_Folsom2014")
+using ProjAssistant
+@quickactivate
 
+## ----------------------------------------------------------------------------
 @time begin
     using Serialization
 
     import Chemostat_Kayser2005
     const ChK = Chemostat_Kayser2005
     const iJR = ChK.iJR904
-    const Kd = ChK.KayserData # experimental data
 
     using Plots
+    import GR
+    !isinteractive() && GR.inline("png")
 
-    import UtilsJL
-    const UJL = UtilsJL
     using Serialization
     using Base.Threads
+
+    using SimTools
+    const SimT = SimTools
 
 end
 
 ## ----------------------------------------------------------------------------
-fileid = "2.1"
-mysavefig(p, pname; params...) = 
-    UJL.mysavefig(p, string(fileid, "_", pname), iJR.MODEL_FIGURES_DIR; params...)
-
-## ----------------------------------------------------------------------------
 let
-    mon = UJL.OnDiskMonitor(iJR.MODEL_CACHE_DIR, "monitor.jld2")
+    monfile = cachedir(iJR, :ME_MONITOR)
+    while !isfile(monfile); @warn("Mon file not found", monfile); sleep(10); end
+    mon = SimT.OnDiskMonitor(monfile)
     live_proves = Dict()
 
-    UJL.watch(mon; wt = 15.0) do ddat
+    mean_min_val, mean_max_val = -1e2, 1e2
+    
+    fun(v) = clamp(v, mean_min_val, mean_max_val)
+
+    SimT.watch(mon; wt = 15.0) do ddat
+
+        isempty(ddat) && return
         
         for (exp, tdat) in ddat
             method = get(tdat, :method, "")
@@ -37,7 +43,8 @@ let
             old_lprove = get!(live_proves, exp, -1.0)
             new_lprove = get(tdat, :live_prove, -1.0)
             old_lprove == new_lprove && continue
-            live_proves[:exp] = new_lprove
+            @info("Doing", exp, old_lprove, new_lprove)
+            live_proves[exp] = new_lprove
 
             for datk in [:round, :gd]
                 kdat = get!(tdat, datk, Dict())
@@ -48,15 +55,15 @@ let
                             (:vg_avPME, :cgD_X), 
                             (:biom_avPME, :exp_growth), 
                         ]
-                    
-                    
+
                     avdat = get(kdat, avk, [])
-                    p = plot(avdat;  title = string(avk), 
+                    p = plot(fun.(avdat);  title = string(avk), 
                         xlabel = "iter", ylabel = string(avk), 
                         lw = 3, label = string(avk)
                     )
+
                     limdat = get(tdat, limk, 0.0)
-                    hline!(p, [limdat]; label = string(limk), 
+                    hline!(p, [fun(limdat)]; label = string(limk), 
                         lw = 3, ls = :dash, color = :black, 
                     )
                     plot!(p; legend = :topleft)
@@ -74,9 +81,15 @@ let
                     push!(ps, p)
                 end
 
-                mysavefig(ps, "monitor"; datk, exp, method)
-                @info("Done", exp, datk)
-            end
-        end
+                sfig(iJR, ps, 
+                    @fileid, "maxent_monitor", 
+                    (;datk, exp, method), 
+                    ".png"
+                ); @info("Done", exp, datk)
+
+            end # for datk in
+
+        end # for (exp, tdat)
+
     end
 end

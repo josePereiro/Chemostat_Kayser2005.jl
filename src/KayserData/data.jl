@@ -11,17 +11,17 @@ function _load_and_bundle()
     empty!(TABLE1)
     empty!(TABLE2)
 
-    CONV_MEDIUM_FILE = procdir("medium_conv.bson")
-    CONV_TABLE1_FILE = procdir("table1_conv.bson")
-    CONV_TABLE2_FILE = procdir("table2_conv.bson")
+    CONV_MEDIUM_FILE = procdir(KayserData, "medium_conv.bson")
+    CONV_TABLE1_FILE = procdir(KayserData, "table1_conv.bson")
+    CONV_TABLE2_FILE = procdir(KayserData, "table2_conv.bson")
 
     !isfile(CONV_MEDIUM_FILE) && return BUNDLE
     !isfile(CONV_TABLE1_FILE) && return BUNDLE
     !isfile(CONV_TABLE2_FILE) && return BUNDLE
     
-    merge!(MEDIUM, UJL.load_data(CONV_MEDIUM_FILE; verbose=false))
-    merge!(TABLE1, UJL.load_data(CONV_TABLE1_FILE; verbose=false))
-    merge!(TABLE2, UJL.load_data(CONV_TABLE2_FILE; verbose=false))
+    merge!(MEDIUM, ldat(CONV_MEDIUM_FILE; verbose=false))
+    merge!(TABLE1, ldat(CONV_TABLE1_FILE; verbose=false))
+    merge!(TABLE2, ldat(CONV_TABLE2_FILE; verbose=false))
 
     # collect all in a single bundle
     for table in [TABLE1, TABLE2]

@@ -25,7 +25,7 @@ const ChSU = Ch.SimulationUtils
 
 using Plots
 import GR
-GR.inline("png")
+!isinteractive() && GR.inline("png")
 using Statistics
 
 ## -------------------------------------------------------------------

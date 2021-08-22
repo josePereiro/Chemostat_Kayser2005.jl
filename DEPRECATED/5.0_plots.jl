@@ -40,7 +40,7 @@ quickactivate(@__DIR__, "Chemostat_Kayser2005")
     # -------------------------------------------------------------------
     using Plots, FileIO
     import GR
-    GR.inline("png")
+    !isinteractive() && GR.inline("png")
     using Base.Threads
 
 end

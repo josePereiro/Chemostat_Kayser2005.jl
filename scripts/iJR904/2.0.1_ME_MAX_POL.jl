@@ -1,13 +1,12 @@
-let
-    method = ME_MAX_POL
+function maxent_max_pol(method, model_key)
+    
     ## -------------------------------------------------------------------
     # Monitor
-    monfile = iJR.cachedir("monitor.jld2")
-    mon = UJL.OnDiskMonitor(monfile)
-    UJL.reset!(mon)
+    mon = SimT.OnDiskMonitor(cachedir(iJR, :ME_MONITOR))
+    SimT.reset!(mon)
 
     # Feed jobs
-    Ch = Channel(nthreads()) do ch
+    Ch = Channel(2 * nthreads()) do ch
         cGLCs = Kd.val("cGLC")
         for (exp, cGLC)  in enumerate(cGLCs)
             put!(ch, (exp, cGLC))
@@ -16,24 +15,24 @@ let
 
     @threads for _ in 1:nthreads()
         thid = threadid()
+        
         for (exp, cGLC) in Ch
             # Excluded because of unfeasibility
-            exp in [1,2,3,4] && continue 
-
+            exp in IGNORE_EXPS && continue 
+            
             ## -------------------------------------------------------------------
             # handle cache
-            datfile = dat_file(;method, exp)
-            check_cache(;method, exp) && continue
+            is_cached(;method, exp) && continue
 
             ## -------------------------------------------------------------------
             # SetUp
-            model =  iJR.load_model("max_model")
+            model = iJR.load_model(model_key)
             M, N = size(model)
             biomidx = ChU.rxnindex(model, iJR.BIOMASS_IDER)
             glcidx = ChU.rxnindex(model, iJR.EX_GLC_IDER)
             exp_growth = Kd.val("D", exp) # experimental biom growth rate (equals D)
             # glc per biomass unit supply
-            cgD_X = -Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:Xv, exp)
+            cgD_X = -Kd.cval(:GLC, exp) * Kd.val(:D, exp) / Kd.val(:X, exp)
             biom_beta = 0.0 # current biomass beta
             biom_betas = [biom_beta] # biomass beta round history
             vg_beta = 0.0 # current vg beta
@@ -48,15 +47,19 @@ let
             epouts = Dict() # epout pool for each round (will contain the solution)
             epout = nothing # current epout (used as seed)
             hasvalid_moments = false # a flag that indicate is the momentous are valid
-            isbeta_stationary = false # a flag that indicates if betas reach stability
             roundconv = false # global (round) converge flag
 
-            epmaxiter = 2000 # maxiter for each maxent_ep
+            ## ----------------------------------------------------
+            # ep params
+            me_params = lglob(iJR, :maxent, :params)
+            @extract me_params: alpha epsconv epmaxiter=maxiter 
+            @extract me_params: damp maxvar minvar
+            
+            ## ----------------------------------------------------
+            # other params
             gdmaxiter = 3000 # maxiter for each gradient descent
             gdth = 0.01  # th of each gradient descend
-            roundth = 0.05 # th of the whole simulation
-            stw = 10 # beta stability check window
-            stth = 0.1 # beta stability check th
+            roundth = 0.01 # th of the whole simulation
             smooth = 0.1 # gd smooth th
 
             # After a while without converge, accelerate
@@ -71,10 +74,10 @@ let
 
             gdit = -1 # current gd iter
             gderr = -1.0 # current gd error
-            last_uptime = -1.0 # time to check if gd needs to update
+            last_infotime = -1.0 # time to check if gd needs to update
             upfrec_time = 15 # update info frequency
 
-           # the whole simulation converge as ~log, 
+            # the whole simulation converge as ~log, 
             # so I force betas increment by stepping
             beta_scale_rounditer0 = 3 # starting round for beta stepping
             beta_scale_factor = 1.0 # stepping scaling factor
@@ -83,7 +86,7 @@ let
             maxrounds = 50 # max no of rounds
 
             # monitor
-            UJL.record!(mon) do dat
+            SimT.record!(mon) do dat
                 tdat = get!(dat, exp, Dict())
                 tdat[:cgD_X] = cgD_X
                 tdat[:method] = method
@@ -97,21 +100,33 @@ let
                 hasvalid_vg_moment = abs(vg_avPME) <= abs(cgD_X) || 
                     abs(vg_avPME - cgD_X)/abs(cgD_X) <= roundth
                 hasvalid_moments = hasvalid_biom_moment && hasvalid_vg_moment
-                isbeta_stationary = UJL.is_stationary(biom_betas, stth, stw) && 
-                    UJL.is_stationary(vg_betas, stth, stw)
-                return hasvalid_moments || isbeta_stationary
+                return hasvalid_moments
             end
 
             ## -------------------------------------------------------------------
             function print_info(msg; varargs...)
-                @info(msg, 
-                    varargs...,
-                    epout.status, epout.iter, 
-                    (biom_avPME_vgb0, biom_avPME, exp_growth), biom_diff, 
-                    (vg_avPME_vgb0, vg_avPME, cgD_X), vg_diff, 
-                    (biom_beta, vg_beta), 
-                    thid
-                ); println()
+                
+                isinfotime = gdit == 1 || abs(last_infotime - time()) > upfrec_time || 
+                    epout.status != ChEP.CONVERGED_STATUS
+
+                !isinfotime && return
+
+                lock(WLOCK) do 
+                    @info(msg, 
+                        varargs...,
+                        epout.status, epout.iter, 
+                        (biom_avPME_vgb0, biom_avPME, exp_growth), biom_diff, 
+                        (vg_avPME_vgb0, vg_avPME, cgD_X), vg_diff, 
+                        (biom_beta, vg_beta), 
+                        thid
+                    ); println()
+                    last_infotime = time()
+                end
+            end
+
+            function check_nan()
+                params = [biom_beta, vg_beta, biom_avPME, vg_avPME]
+                any(isnan.(params))
             end
 
             ## -------------------------------------------------------------------
@@ -123,46 +138,43 @@ let
                 # MAXENT
                 epout = ChEP.maxent_ep(model; 
                     beta_vec,
-                    alpha = Inf,
+                    alpha, epsconv,
+                    maxvar, minvar, damp, 
                     maxiter = epmaxiter,  
-                    epsconv = 1e-3, 
                     verbose = false, 
                     solution = epout
                 )
 
-                biom_avPME = ChU.av(model, epout, iJR.ORIG_BIOMASS_IDER)
+                # update 
+                biom_avPME = ChU.av(model, epout, iJR.BIOMASS_IDER)
                 vg_avPME = ChU.av(model, epout, iJR.EX_GLC_IDER)
                 biom_diff = abs(biom_avPME - exp_growth)
                 vg_diff = abs(vg_avPME - cgD_X)
-
-                update = gdit == 1 || abs(last_uptime - time()) > upfrec_time || 
-                    epout.status != ChEP.CONVERGED_STATUS
                 
                 gderr = gdmodel.ϵi
-                update && lock(WLOCK) do
-                    print_info(msg;
-                        exp, rounditer, gdit, gderr, 
-                        vg_gddamp, biom_gddamp,
-                    )
-                    last_uptime = time()
-                end
+                print_info(msg;
+                    exp, rounditer, gdit, gderr, 
+                    vg_gddamp, biom_gddamp,
+                )
 
                 # MONITOR
-                UJL.record!(mon) do dat
+                SimT.record!(mon) do dat
                     tdat = get!(dat, exp, Dict())
                     tdat[:live_prove] = rand()
                     gddat = get!(tdat, :gd, Dict())
-                    UJL.get!push!(gddat; 
+                    SimT.get!push!(gddat; 
                         vg_beta, biom_beta, 
                         biom_avPME, vg_avPME
                     )
                 end
 
                 # RUN OUT OF PATIENT
-                (gdit >= turbo_iter0 && rem(gdit, turbo_frec) == 0) && (gdmodel.maxΔx *= turbo_factor)
+                (gdit >= turbo_iter0 && rem(gdit, turbo_frec) == 0) && 
+                    (gdmodel.maxΔx *= turbo_factor)
                 
                 gdit += 1
             end
+
 
             while true
 
@@ -185,17 +197,12 @@ let
                     maxΔx = max(abs(biom_beta) * 0.05, 1e4)
                     minΔx = maxΔx * 0.01
                     x1 = x0 + maxΔx * 0.01
-                    senses = [] # To detect damping
-                    check_damp_frec = 10
-                    dampth = 0.8
-                    maxΔx_reduce_factor = 0.9
                     
-                    last_uptime = time()
                     gdit = 1
 
                     ## -------------------------------------------------------------------
                     function z_fun(gdmodel)
-                        biom_beta = UJL.gd_value(gdmodel)
+                        biom_beta = SimT.gd_value(gdmodel)
                         gd_core_fun(gdmodel; msg = "z grad descent... ")
                         return biom_avPME
                     end
@@ -208,27 +215,27 @@ let
                     end
 
                     ## -------------------------------------------------------------------
-                    gdmodel = UJL.grad_desc(z_fun; 
+                    gdmodel = SimT.grad_desc(z_fun; 
                         x0, x1, gdth, minΔx, maxΔx, smooth,
                         target, maxiter = gdmaxiter, 
                         damp_factor, damp = biom_gddamp,
                         break_cond = z_break_cond,
                         verbose = false
                     )
-                    biom_beta = UJL.gd_value(gdmodel)
+                    biom_beta = SimT.gd_value(gdmodel)
                     biom_gddamp = gdmodel.damp
                 end
 
                 ## -------------------------------------------------------------------
                 # AT VG BETA 0 MOMENTS
-                firstround = rounditer == 1
-                firstround && let
+                isfirstround = (rounditer == 1)
+                isfirstround && let
                     biom_avPME_vgb0 = biom_avPME
                     vg_avPME_vgb0 = vg_avPME
                 end
 
                 ## -------------------------------------------------------------------
-                # Force vg boundary
+                # FORCE VG BOUNDARY
                 let
                     ## -------------------------------------------------------------------
                     # VG GRAD DESCEND: Match biomass momentums
@@ -238,12 +245,11 @@ let
                     minΔx = maxΔx * 0.01
                     x1 = x0 + maxΔx * 0.01
             
-                    last_uptime = time()
                     gdit = 1
-
+    
                     ## -------------------------------------------------------------------
                     function vg_fun(gdmodel)
-                        vg_beta = UJL.gd_value(gdmodel)
+                        vg_beta = SimT.gd_value(gdmodel)
                         gd_core_fun(gdmodel; msg = "vg grad descent... ")
                         return vg_avPME
                     end
@@ -252,11 +258,11 @@ let
                     function vg_break_cond(epmodel)
                         vgconv = abs(vg_avPME) <= abs(cgD_X)
                         roundconv = check_roundconv()
-                        (rounditer > 10 && roundconv) || vgconv
+                        roundconv || vgconv
                     end
 
                     ## -------------------------------------------------------------------
-                    gdmodel = UJL.grad_desc(vg_fun; 
+                    gdmodel = SimT.grad_desc(vg_fun; 
                         x0, x1, gdth, minΔx, maxΔx,
                         break_cond = vg_break_cond,
                         damp_factor, damp = vg_gddamp,
@@ -264,7 +270,7 @@ let
                         verbose = false
                     )
 
-                    vg_beta = UJL.gd_value(gdmodel)
+                    vg_beta = SimT.gd_value(gdmodel)
                     vg_gddamp = gdmodel.damp
                 end
 
@@ -272,25 +278,23 @@ let
                 # COLLECTING
                 push!(biom_betas, biom_beta)
                 push!(vg_betas, vg_beta)
-                empty!(epouts) # Test
                 epouts[(biom_beta, vg_beta)] = epout
-                
-                ## -------------------------------------------------------------------
-                # CEHCK NAN
-                if any(isnan.(biom_betas)) || any(isnan.(vg_betas))
-                    print_info("Nan detected (BIG PROBLEMS HERE)"; 
-                        exp, rounditer
-                    )
-                    break
-                end
 
                 ## -------------------------------------------------------------------
+                # CHECK NAN
+                if check_nan()
+                    print_info("Nan detected (BIG PROBLEMS HERE)"; 
+                        exp, rounditer
+                    ); break
+                end
+                
+                ## -------------------------------------------------------------------
                 # MONITOR
-                UJL.record!(mon) do dat
+                SimT.record!(mon) do dat
                     tdat = get!(dat, exp, Dict())
                     tdat[:live_prove] = rand()
                     rdat = get!(tdat, :round, Dict())
-                    UJL.get!push!(rdat; 
+                    SimT.get!push!(rdat; 
                         vg_beta, biom_beta, 
                         biom_avPME, vg_avPME
                     )
@@ -298,12 +302,10 @@ let
 
                 ## -------------------------------------------------------------------
                 # PRINT INFO
-                lock(WLOCK) do
-                    print_info("Round Done"; exp, rounditer, 
-                        hasvalid_moments, isbeta_stationary, roundconv
-                    )
-                end
-
+                print_info("Round Done"; exp, rounditer, 
+                    hasvalid_moments, roundconv
+                )
+                
                 ## -------------------------------------------------------------------
                 # BREAK
                 roundconv && break
@@ -313,107 +315,47 @@ let
             end # round while
 
             ## -------------------------------------------------------------------
+            # further conv
+            let
+                # MAXENT
+                epout = ChEP.maxent_ep(model; 
+                    beta_vec,
+                    alpha, 
+                    epsconv = epsconv * 0.1,
+                    maxiter = max(epmaxiter * 3, 5000),
+                    maxvar, minvar, damp, 
+                    verbose = false, 
+                    solution = epout
+                )
+                epouts[(biom_beta, vg_beta)] = epout
+                
+                # update 
+                biom_avPME = ChU.av(model, epout, iJR.BIOMASS_IDER)
+                vg_avPME = ChU.av(model, epout, iJR.EX_GLC_IDER)
+                biom_diff = abs(biom_avPME - exp_growth)
+                vg_diff = abs(vg_avPME - cgD_X)
+
+                print_info("Further conv "; exp)
+            end
+
+            ## -------------------------------------------------------------------
+            # Storing
             lock(WLOCK) do
 
-                # Storing
                 dat = Dict()
                 dat[:exp_beta] = (biom_beta, vg_beta)
                 dat[:epouts] = epouts
                 dat[:model] = model |> ChU.compressed_model
 
-                # caching
-                serialize(datfile, dat)
-                
+                datfile = dat_file(;method, exp)
+                sdat(iJR, dat, datfile)
+
                 print_info("Finished "; exp, rounditer)
             end
 
         end # for exp, cGLC
     end # for thid
-    UJL.reset!(mon)
+
+    SimT.reset!(mon)
+
 end
-
-# TODO implement further convergence
-# ## -------------------------------------------------------------------
-# # further convergence
-# let
-#     method = ME_MAX_POL
-    
-#     cGLCs = Kd.val("cGLC")
-#     for (exp, cGLC)  in enumerate(cGLCs)
-        
-#         datfile = dat_file(;method, exp)
-#         !isfile(datfile) && continue
-
-#         dat = deserialize(datfile)
-#         converg_status = get(dat, :converg_status, false)
-
-#         model = dat[:model] |> ChU.uncompressed_model
-#         M, N = size(model)
-#         epouts = dat[:epouts]
-#         biom_beta0, vg_beta0 = dat[:exp_beta]
-#         # biom_beta, vg_beta = maximum(keys(epouts))
-#         # epout = epouts[(biom_beta, vg_beta)]
-
-#         biomidx = ChU.rxnindex(model, iJR.BIOMASS_IDER)
-#         glcidx = ChU.rxnindex(model, iJR.EX_GLC_IDER)
-
-#         @info("Converging Doing", method, exp, 
-#             biom_beta, vg_beta, 
-#             converg_status
-#         ); println()
-        
-#         converg_status && continue
-
-#         # MAXENT
-#         function oniter(it, epmodel) 
-#             max_err = epmodel.stat[:max_err]
-#             if isnan(max_err) 
-#                 @warn("Nan detected!!!", it); println()
-#                 return (true, :FATAL_ERROR)
-#             end
-#             (false, nothing)
-#         end
-#         beta_vec = zeros(N)
-
-#         epout = nothing
-
-#         biom_betas = range(0.0, biom_beta0; length = 50)
-#         for biom_beta in biom_betas
-
-#             beta_vec[biomidx] = biom_beta
-#             beta_vec[glcidx] = vg_beta0
-
-#             damp = 0.9
-#             maxiter = 5000
-#             epsconv = 1e-4
-#             # minvar = 1e-20
-#             # maxvar = 1e20
-#             epout = ChEP.maxent_ep(model; 
-#                 oniter, beta_vec, alpha = Inf,
-#                 maxiter,  epsconv, damp,
-#                 # minvar, maxvar,
-#                 verbose = true, 
-#                 solution = epout
-#             ); println()
-            
-#             epout == :FATAL_ERROR && break
-#         end
-#         epout == :FATAL_ERROR && continue
-
-#         converg_status =  epout.status != ChEP.CONVERGED_STATUS 
-#         if !converg_status
-#             @warn("Not converged", 
-#                 method, exp, 
-#                 biom_beta, vg_beta, 
-#                 epout.status,
-#                 converg_status
-#             ); println()
-#         end
-
-#         dat[:epouts] = epouts
-#         dat[:converg_status] = converg_status
-#         # serialize(datfile, dat)
-
-#         break
-#     end 
-# end

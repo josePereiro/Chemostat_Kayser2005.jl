@@ -1,6 +1,7 @@
-import DrWatson: quickactivate
-quickactivate(@__DIR__, "Chemostat_Kayser2005")
+using ProjAssistant
+@quickactivate 
 
+# ------------------------------------------------------------------
 @time begin
     import MAT
 
@@ -21,10 +22,10 @@ end
 
 ## ------------------------------------------------------------------
 # LOAD RAW MODEL
-src_file = iJR.rawdir("iJR904.mat")
+src_file = rawdir(iJR, "iJR904.mat")
 mat_model = MAT.matread(src_file)["model"]
 model = ChU.MetNet(mat_model; reshape=true)
-ChU.tagprintln_inmw("MAT MODEL LOADED", 
+println("MAT MODEL LOADED", 
     "\nfile:             ", relpath(src_file), 
     "\nfile size:        ", filesize(src_file), " bytes", 
     "\nmodel size:       ", size(model),
@@ -35,7 +36,7 @@ ChK.test_fba(model, iJR.ORIG_BIOMASS_IDER; summary = false)
 ## -------------------------------------------------------------------
 # Set bounds
 # The abs maximum bounds will be set to 100
-ChU.tagprintln_inmw("CLAMP BOUNDS", 
+println("CLAMP BOUNDS", 
     "\nabs max bound: ", iJR.ABS_MAX_BOUND
 )
 foreach(model.rxns) do ider
@@ -53,7 +54,7 @@ end
 ## -------------------------------------------------------------------
 # CLOSING EXCHANGES
 exchs = ChU.exchanges(model)
-ChU.tagprintln_inmw("CLOSE EXCANGES", 
+println("CLOSE EXCANGES", 
     "\nChU.exchanges: ", exchs |> length
 )
 # Close, for now, all ChU.exchanges for avoiding it to be in revs
@@ -63,20 +64,6 @@ foreach(exchs) do idx
     ChU.ub!(model, idx, 0.0) # Closing all outtakes
     ChU.lb!(model, idx, 0.0) # Closing all intakes
 end
-
-# ## -------------------------------------------------------------------
-# # EXCHANGE METABOLITE MAP
-# exch_met_map = Dict()
-# for rxni in exchs
-#     rxn = model.rxns[rxni]
-#     metis = ChU.rxn_mets(model, rxni)
-#     mets = model.mets[metis]
-#     length(mets) != 1 && continue 
-#     met = mets |> first
-#     exch_met_map[rxn] = met
-#     exch_met_map[met] = rxn
-# end
-# ChU.save_data(iJR.EXCH_MET_MAP_FILE, exch_met_map)
 
 ## -------------------------------------------------------------------
 # ENZYMATIC COST INFO
@@ -110,7 +97,7 @@ end
 
 ## -------------------------------------------------------------------
 # SPLITING REVS
-ChU.tagprintln_inmw("SPLITING REVS", 
+println("SPLITING REVS", 
     "\nfwd_suffix:      ", ChU.FWD_SUFFIX,
     "\nbkwd_suffix:     ", ChU.BKWD_SUFFIX,
 )
@@ -131,7 +118,7 @@ ChU.set_met!(model, ChU.findempty(model, :mets), cost_met)
 cost_exch = ChU.Rxn(cost_exch_id, S = [1.0], mets = [cost_met_id], lb = -iJR.ABS_MAX_BOUND, ub = 0.0, c = 0.0)
 ChU.set_rxn!(model, ChU.findempty(model, :rxns), cost_exch);
 
-ChU.tagprintln_inmw("ADDING COST", 
+println("ADDING COST", 
     "\ncosts to add:       ", cost_info |> length,
     "\nmin abs coe:        ", cost_info |> values .|> abs |> minimum,
     "\nmax abs coe:        ", cost_info |> values .|> abs |> maximum,
@@ -142,7 +129,7 @@ ChU.tagprintln_inmw("ADDING COST",
 
 ## -------------------------------------------------------------------
 # SET BASE EXCHANGE
-ChU.tagprintln_inmw("SETTING EXCHANGES") 
+println("SETTING EXCHANGES") 
 # To control the intakes just the metabolites defined in the 
 # base_intake_info (The minimum medium) will be opened.
 # The base model will be constraint as in a cultivation with 
@@ -165,7 +152,7 @@ ChU.lb!(model, cost_exch_id, 0.0);
 ChU.ub!(model, cost_exch_id, 1.0);
 
 ## -------------------------------------------------------------------
-ChU.tagprintln_inmw("ADDING KAYSER BIOMASS")
+println("ADDING KAYSER BIOMASS")
 # Adding kayser biomass equation
 ChU.bounds!(model, iJR.ORIG_BIOMASS_IDER, 0.0, 0.0)
 model = iJR.add_kayser_biomass(model; UB = 10 * iJR.ABS_MAX_BOUND)
@@ -194,15 +181,15 @@ end
 
 ## -------------------------------------------------------------------
 # FVA PREPROCESSING
-MODELS_FILE = iJR.procdir("base_models.bson")
+MODELS_FILE = procdir(iJR, "base_models.bson")
 compressed(model) = model |> ChU.struct_to_dict |> ChU.compressed_copy
 const BASE_MODELS = isfile(MODELS_FILE) ? 
-    ChU.load_data(MODELS_FILE) : 
-    Dict("load_model" => compressed(model))
+    ldat(MODELS_FILE) : 
+    Dict("base_model" => compressed(model))
 for (exp, D) in Kd.val(:D) |> enumerate
 
     DAT = get!(BASE_MODELS, "fva_models", Dict())
-    ChU.tagprintln_inmw("DOING FVA", 
+    println("DOING FVA", 
         "\nexp:             ", exp,
         "\nD:               ", D,
         "\ncProgress:       ", length(DAT),
@@ -232,7 +219,7 @@ for (exp, D) in Kd.val(:D) |> enumerate
 
     ## -------------------------------------------------------------------
     # caching
-    ChU.save_data(MODELS_FILE, BASE_MODELS);
+    sdat(BASE_MODELS, MODELS_FILE);
     GC.gc()
 end
 
@@ -244,7 +231,7 @@ let
     # Varma, (1993): 2465–73. https://doi.org/10.1128/AEM.59.8.2465-2473.1993.
     # Extract max exchages from FIG 3 to form the maximum polytope
 
-    ChU.tagprintln_inmw("DOING MAX MODEL", 
+    println("DOING MAX MODEL", 
         "\n"
     )
 
@@ -286,5 +273,5 @@ let
     ## -------------------------------------------------------------------
     # saving
     BASE_MODELS["max_model"] = compressed(max_model)
-    ChU.save_data(MODELS_FILE, BASE_MODELS);
+    sdat(BASE_MODELS, MODELS_FILE);
 end;
