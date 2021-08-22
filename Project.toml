@@ -1,7 +1,7 @@
 name = "Chemostat_Kayser2005"
 uuid = "62075988-fc80-11ea-3c7a-ad81f43b029e"
 authors = ["josePereiro <jose.pereiro.lab@gmail.com>"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"

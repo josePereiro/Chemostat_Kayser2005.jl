@@ -12,7 +12,7 @@ using ProjAssistant
     const iJR = ChK.iJR904
     const Kd = ChK.KayserData # experimental data
     const Bd = ChK.BegData    # cost data
-
+    
     import Chemostat
     const Ch = Chemostat
     const ChU = Ch.Utils
