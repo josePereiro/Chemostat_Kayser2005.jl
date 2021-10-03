@@ -127,12 +127,6 @@ git-tree-sha1 = "03191fb664951065ad9e9e11e5457cf1d4fc7e7b"
 uuid = "c5987326-81b3-11ea-28dd-b531745de20f"
 version = "0.11.1"
 
-[[ChemostatPlots]]
-deps = ["Chemostat", "Distributions", "LinearAlgebra", "Plots"]
-git-tree-sha1 = "7e2b289492240ebd38cbbd3e34307eb30183976e"
-uuid = "a87e7f4e-3b34-4b5e-ad6b-f0ab85127471"
-version = "0.1.5"
-
 [[Clp]]
 deps = ["BinaryProvider", "Libdl", "LinearAlgebra", "MathOptInterface", "MathProgBase", "SparseArrays"]
 git-tree-sha1 = "0872354eaeb05a86e400f45abaac1dc93da7bf76"
